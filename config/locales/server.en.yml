@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+en:
+  sideloaded_apps:
+    errors:
+      not_found: "Review not found"
+      not_in_category: "This topic is not in the Sideloaded Apps Ranking category"
+    report_outdated:
+      pm_title: "Outdated version report: %{app_name}"
+      pm_body: |
+        @%{reporter} reported that [%{app_name}](%{topic_url}) (version %{version}) may have an outdated version.
+
+        Please check and update the review if needed.
+      cannot_report_own: "You cannot report your own review"
+      no_recipients: "No recipients"
+      min_length: "Minimum %{count} characters required"

@@ -1,0 +1,19 @@
+plugins:
+  sideloaded_apps_ranking_enabled:
+    default: true
+    client: true
+    description: "Enable the Sideloaded Apps Ranking plugin"
+  sideloaded_apps_category_slug:
+    default: "sideloaded-apps-ranking"
+    client: true
+    description: "Slug of the category used for the Sideloaded Apps Ranking (must match the category you create)"
+  sideloaded_apps_verification_enabled:
+    default: true
+    client: true
+    description: "Enable automatic APK link verification (daily checksum and availability checks)"
+  sideloaded_apps_verification_interval_minutes:
+    default: 30
+    description: "How often to verify APK links (in minutes)"
+  sideloaded_apps_max_apk_file_size_mb:
+    default: 200
+    description: "Maximum APK file size (MB) to download for checksum verification"

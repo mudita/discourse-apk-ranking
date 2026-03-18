@@ -1,0 +1,171 @@
+en:
+  js:
+    sideloaded_apps:
+      title: "Sideloaded Apps Ranking"
+      subtitle: "Community-rated apps for Mudita Kompakt"
+      nav_label: "Sideloaded Apps"
+      new_review: "New Review"
+
+      banner:
+        title: "Sideloaded Apps Ranking"
+        text: "Discover community-rated apps for your Kompakt. Share your experience and rate the best sideloaded apps!"
+        cta: "Browse Sideloaded Apps"
+
+      composer:
+        validation_error: "Please fill in all required fields: Application Name, Category, APK Link, Version, Rating, and Description."
+        validation_missing: "Please fill in: %{fields}"
+        validation_invalid: "Please fix: %{fields}"
+        create_info_post: "Create info post (tutorial, FAQ, etc.)"
+        info_post_hint: "Use the fields below to write your tutorial, FAQ or other info post."
+
+      form:
+        title: "Submit App Review"
+        edit_title: "Edit App Review"
+        app_name: "Application Name"
+        app_name_placeholder: "e.g. Signal Messenger"
+        app_category: "Application Category"
+        app_category_placeholder: "Select a category..."
+        apk_link: "Link to APK"
+        apk_link_placeholder: "https://..."
+        apk_link_help: "Direct link to the APK file"
+        apk_version: "APK Version"
+        apk_version_placeholder: "e.g. 6.45.2"
+        checksum: "Checksum (optional)"
+        checksum_label: "SHA-256 Checksum"
+        checksum_placeholder: "e.g. SHA-256 hash"
+        checksum_help: "Optional file checksum for integrity verification"
+        screenshots: "Screenshots on Kompakt"
+        screenshots_help: "Upload screenshots showing the app running on your Kompakt"
+        add_screenshot: "Add Screenshot"
+        remove_screenshot: "Remove screenshot"
+        author_rating: "Your Rating"
+        author_rating_help: "Rate this app 1-5 stars based on usability on Kompakt"
+        author_is_developer: "I am the developer of this app"
+        icon_url: "App icon URL (optional)"
+        icon_url_placeholder: "https://..."
+        icon_url_help: "Link to app icon image for display in topic list"
+        description: "App Description & Usability"
+        description_placeholder: "Describe the application and your experience using it on Mudita Kompakt..."
+        known_issues: "Known Issues"
+        known_issues_placeholder: "List any known issues or limitations when running on Kompakt..."
+        submit: "Submit Review"
+        update: "Update Review"
+        submitting: "Submitting..."
+
+        validation:
+          required: "This field is required"
+          app_name_min: "Application name must be at least 2 characters"
+          app_name_max: "Application name must be at most 100 characters"
+          apk_link_url: "Please enter a valid URL (http or https)"
+          apk_version_required: "Version is required (e.g. 1.0.0)"
+          description_min: "Description must be at least 20 characters"
+          rating_required: "Please select a rating (1-5 stars)"
+          category_required: "Please select a category"
+
+      reply_rating:
+        title: "Rate this app"
+        your_rating: "Your rating"
+        help: "Your star rating is required when commenting"
+        already_rated: "You have already rated this app"
+        validation_error: "Please select a star rating (1-5) for your comment."
+
+      categories:
+        all: "All Categories"
+        communication: "Communication"
+        social: "Social"
+        productivity: "Productivity"
+        utilities: "Utilities"
+        health: "Health & Fitness"
+        finance: "Finance"
+        entertainment: "Entertainment"
+        music: "Music & Audio"
+        navigation: "Navigation"
+        weather: "Weather"
+        news: "News"
+        education: "Education"
+        other: "Other"
+
+      inline_rating:
+        rate_this: "Rate this app"
+        your_rating: "Your rating"
+
+      rating:
+        average: "Average Rating"
+        count: "ratings"
+        author: "Author's Rating"
+        community: "Community Rating"
+        no_ratings: "No ratings yet"
+
+      stars:
+        label: "Rating"
+        out_of: "out of 5"
+
+      list:
+        last_updated: "Last Updated"
+        app_name: "Application"
+        category: "Category"
+        rating: "Rating"
+
+      last_access_date: "Last Successful Access"
+      last_access_never: "Not yet accessed"
+      review_placeholder: "[Sideloaded App Review]"
+      reply_version_prefix: "Review for version"
+      download_apk: "Download APK"
+      download_checking: "Checking..."
+
+      edit_review:
+        button: "Edit Review"
+        save: "Save Changes"
+        cancel: "Cancel"
+        saving: "Saving..."
+
+      verification:
+        file_available: "File is accessible"
+        file_unavailable: "File is not accessible"
+        link_available: "Link is accessible"
+        link_unavailable: "Link is not accessible"
+        consistent: "File checksum matches - file has not been modified"
+        inconsistent: "File checksum mismatch - file may have been modified since submission"
+        unknown: "Verification status unknown"
+        last_checked: "Last checked"
+        never_checked: "Not yet verified"
+        consistent_short: "Verified"
+        accessible_short: "Accessible"
+        unknown_short: "Unverified"
+        inconsistent_short: "Changed"
+
+      link_validation:
+        checking: "Verifying link..."
+        valid: "Direct download link verified"
+        webpage_link: "This links to a webpage. Checksum verification will be skipped."
+        not_a_download: "This URL points to a webpage, not a downloadable file. Please provide a direct download link."
+        checksum_mismatch: "The file's checksum does not match the checksum you provided. Please verify the link and checksum."
+        verification_failed: "Could not verify the APK link. Please check the URL and try again."
+        url_required: "URL is required"
+        invalid_scheme: "Invalid URL scheme — only HTTP and HTTPS are supported"
+        invalid_url: "Invalid URL format"
+        http_error: "Server returned HTTP %{code}"
+        unreachable: "Could not reach server: %{message}"
+        file_too_large: "File exceeds maximum size of %{max_mb}MB"
+        file_size_bytes: "%{count} bytes"
+        cannot_submit_invalid: "The APK link could not be verified. Please fix the link before submitting."
+        still_checking: "Link verification is still in progress. Please wait a moment and try again."
+
+      dev_badge: "DEV"
+      report_outdated: "Report outdated version"
+      report_outdated_sending: "Sending..."
+      report_outdated_success: "Report sent to review author and moderators."
+      report_outdated_submit: "Send report"
+      report_outdated_modal:
+        intro: "Please describe why you believe this app version is outdated. Your message will be sent to the review author and moderators."
+        message_label: "Your message (required)"
+        message_placeholder: "e.g. The Play Store shows version 6.50, but this review lists 6.45..."
+        min_length: "Minimum %{count} characters required"
+      top_apps:
+        title: "Top 5 Apps"
+
+      errors:
+        not_in_category: "This topic is not in the Sideloaded Apps Ranking category"
+        already_exists: "A review already exists for this topic"
+        not_found: "Review not found"
+        unauthorized: "You are not authorized to perform this action"

@@ -1,0 +1,1006 @@
+$sl-primary: #0066cc;
+$sl-star-color: #f1c40f;
+$sl-star-empty: #ddd;
+$sl-border: #e9ecef;
+$sl-bg-light: #f8f9fa;
+$sl-text-muted: #6c757d;
+$sl-radius: 8px;
+$sl-negative: #e74c3c;
+
+// ── Composer: hide standard fields + scrollable form when review active ──
+// Uses var(--composer-height) so layout adapts to grippie drag resize
+body.sideloaded-composer-active {
+  #reply-control {
+    .composer-action-title {
+      display: none !important;
+    }
+
+    .title-and-category {
+      display: none !important;
+    }
+
+    .d-editor-textarea-wrapper {
+      display: none !important;
+    }
+
+    .d-editor-preview-wrapper {
+      display: none !important;
+    }
+  }
+
+  // Ensure form scrolls and submit buttons stay visible at all resolutions
+  // and when user resizes composer via grippie (var(--composer-height) updates)
+  #reply-control.open {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+
+    .reply-area {
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      overflow: hidden;
+    }
+
+    .wmd-controls {
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      overflow: hidden;
+    }
+
+    .d-editor,
+    .d-editor-container,
+    .d-editor-textarea-column {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      overflow: hidden;
+    }
+
+    .composer-fields {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      max-height: calc(var(--composer-height, 400px) - 180px);
+    }
+
+    .submit-panel {
+      flex-shrink: 0 !important;
+    }
+  }
+}
+
+// ── Staff-only: Create info post (tutorial, FAQ) toggle ──
+.sideloaded-composer-mode-toggle {
+  margin-bottom: 0.75em;
+  padding: 0.5em 0;
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    cursor: pointer;
+    font-size: 0.95em;
+  }
+
+  input[type="checkbox"] {
+    margin: 0;
+  }
+}
+
+.sideloaded-composer-info-hint {
+  padding: 0.5em 0;
+  font-size: 0.95em;
+  color: var(--primary-medium);
+}
+
+// ── First post in sideloaded apps: hide cooked + edit pencil ──
+// The post body is kept in DOM for SEO but visually hidden.
+// Uses .sideloaded-apps-topic class added by the review card component.
+body.sideloaded-apps-topic {
+  .topic-post article#post_1 {
+    .cooked {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .post-menu-area .post-action-menu__edit,
+    .post-menu-area .widget-button.edit {
+      display: none !important;
+    }
+  }
+}
+
+// ── Homepage Banner ─────────────────────────────────
+.sideloaded-apps-banner {
+  margin-bottom: 16px;
+  padding: 20px 24px;
+  border-radius: $sl-radius;
+  background: linear-gradient(
+    135deg,
+    rgba($sl-primary, 0.08) 0%,
+    rgba($sl-primary, 0.02) 100%
+  );
+  border: 1px solid rgba($sl-primary, 0.15);
+
+  &__content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.15em;
+    font-weight: 600;
+    color: $sl-primary;
+  }
+
+  &__text {
+    margin: 0;
+    flex: 1;
+    min-width: 200px;
+    font-size: 0.93em;
+    color: $sl-text-muted;
+  }
+
+  &__link {
+    white-space: nowrap;
+  }
+}
+
+.sideloaded-category-filter__container {
+  padding: 12px 10px;
+  border-radius: 8px;
+  border: 1px solid #00000040;
+  margin-top: 32px;
+
+  .sideloaded-category-filter__title {
+    font-family: "Facto", sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: #000000;
+    text-align: center;
+  }
+}
+
+// ── Category Filter Pills ────────────────────────────
+.sideloaded-category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 0px;
+  justify-content: center;
+
+  &__pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: 1px solid $sl-border;
+    background: white;
+    color: #555;
+    font-size: 0.85em;
+    font-weight: 500;
+    text-decoration: none;
+    transition:
+      background 0.2s,
+      color 0.2s,
+      border-color 0.2s;
+    white-space: nowrap;
+
+    &:hover {
+      background: rgba($sl-primary, 0.06);
+      border-color: rgba($sl-primary, 0.3);
+      color: $sl-primary;
+      text-decoration: none;
+    }
+
+    &.active {
+      background: $sl-primary;
+      border-color: $sl-primary;
+      color: white;
+
+      &:hover {
+        background: darken($sl-primary, 8%);
+        color: white;
+      }
+    }
+  }
+}
+
+// ── Composer Review Fields ──────────────────────────
+body.sideloaded-composer-active {
+  .sideloaded-composer-fields {
+    max-height: calc(100vh - 240px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.sideloaded-composer-fields {
+  padding: 16px;
+  margin: 8px 0;
+  padding-bottom: 24px;
+  border: 1px solid $sl-border;
+  border-radius: $sl-radius;
+  background: $sl-bg-light;
+
+  &__title {
+    margin: 0 0 14px;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: $sl-primary;
+  }
+}
+
+.sideloaded-form__field {
+  margin-bottom: 12px;
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 0.9em;
+    color: #333;
+  }
+
+  input[type="text"],
+  input[type="url"],
+  select,
+  textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid $sl-border;
+    border-radius: 6px;
+    font-size: 0.9em;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: $sl-primary;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba($sl-primary, 0.1);
+    }
+  }
+
+  textarea {
+    min-height: 60px;
+    resize: vertical;
+  }
+
+  select {
+    appearance: auto;
+  }
+
+  &.--has-error {
+    input[type="text"],
+    input[type="url"],
+    select,
+    textarea {
+      border-color: $sl-negative;
+
+      &:focus {
+        border-color: $sl-negative;
+        box-shadow: 0 0 0 3px rgba($sl-negative, 0.15);
+      }
+    }
+
+    > label:first-child {
+      color: $sl-negative;
+    }
+  }
+}
+
+.sideloaded-form__help {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8em;
+  color: $sl-text-muted;
+}
+
+.sideloaded-form__error {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8em;
+  color: $sl-negative;
+}
+
+// ── Screenshot Upload Preview ───────────────────────
+.sideloaded-screenshot-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+
+  &__item {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid $sl-border;
+  }
+
+  &__img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.85);
+    }
+  }
+}
+
+.sideloaded-screenshot-upload {
+  margin-top: 8px;
+
+  .hidden-upload-field {
+    display: none !important;
+  }
+}
+
+// ── Link Validation Status ──────────────────────────
+.sideloaded-link-status {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.85em;
+  font-weight: 500;
+
+  &.--checking {
+    color: $sl-text-muted;
+  }
+
+  &.--valid {
+    color: var(--success);
+  }
+
+  &.--info {
+    color: var(--tertiary);
+  }
+
+  &.--invalid {
+    color: var(--danger);
+  }
+}
+
+// ── Reply Rating ────────────────────────────────────
+.sideloaded-reply-rating {
+  padding: 12px 16px;
+  margin: 8px 0;
+  border: 1px solid $sl-border;
+  border-radius: $sl-radius;
+  background: $sl-bg-light;
+
+  &__label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.95em;
+    color: $sl-primary;
+  }
+
+  &__help {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8em;
+    color: $sl-text-muted;
+  }
+}
+
+// ── Star Rating ─────────────────────────────────────
+.sideloaded-star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  .sideloaded-star {
+    font-size: 1.4em;
+    color: $sl-star-empty;
+    cursor: default;
+    transition: color 0.15s ease;
+    line-height: 1;
+
+    &.filled {
+      color: $sl-star-color;
+    }
+  }
+
+  &.interactive .sideloaded-star {
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px;
+
+    &:hover {
+      color: $sl-star-color;
+      transform: scale(1.15);
+    }
+  }
+
+  .sideloaded-star-text {
+    margin-left: 8px;
+    font-size: 0.85em;
+    color: $sl-text-muted;
+  }
+}
+
+// ── Review Display (in topic view) ──────────────────
+.sideloaded-review-display {
+  margin: 20px 0;
+  padding: 24px;
+  border: 1px solid $sl-border;
+  border-radius: $sl-radius;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid $sl-border;
+  }
+
+  &__app-name {
+    margin: 0;
+    font-size: 1.4em;
+    font-weight: 600;
+  }
+
+  &__app-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid $sl-border;
+    background: $sl-bg-light;
+  }
+
+  &__category-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 12px;
+    background: rgba($sl-primary, 0.1);
+    color: $sl-primary;
+    font-size: 0.8em;
+    font-weight: 500;
+  }
+
+  &__dev-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(46, 125, 50, 0.15);
+    color: #2e7d32;
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  &__info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  &__info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__label {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: $sl-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__value {
+    font-size: 1em;
+    font-weight: 500;
+    color: #333;
+  }
+
+  &__avg-rating {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  &__avg-value {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: $sl-star-color;
+  }
+
+  &__avg-count {
+    font-size: 0.85em;
+    color: $sl-text-muted;
+  }
+
+  &__download {
+    margin: 20px 0;
+    padding: 16px 20px;
+    background: $sl-bg-light;
+    border-radius: $sl-radius;
+    border: 1px solid $sl-border;
+  }
+
+  &__download-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__download-btn {
+    white-space: nowrap;
+  }
+
+  &__download-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid $sl-border;
+  }
+
+  &__download-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__download-meta-label {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: $sl-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__download-meta-value {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #333;
+  }
+
+  &__checksum {
+    font-family: monospace;
+    font-size: 0.75em;
+    color: $sl-text-muted;
+    word-break: break-all;
+  }
+
+  &__description {
+    margin: 16px 0;
+
+    p {
+      margin: 0;
+      color: #444;
+      line-height: 1.6;
+    }
+  }
+
+  &__screenshots {
+    margin: 20px 0;
+
+    h4 {
+      margin: 0 0 12px;
+      font-size: 1em;
+      color: #333;
+    }
+  }
+
+  &__screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  &__screenshot {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid $sl-border;
+    object-fit: cover;
+    max-height: 400px;
+  }
+
+  &__known-issues {
+    margin: 20px 0;
+    padding: 16px;
+    background: rgba($sl-negative, 0.05);
+    border-left: 3px solid $sl-negative;
+    border-radius: 0 $sl-radius $sl-radius 0;
+
+    h4 {
+      margin: 0 0 8px;
+      font-size: 1em;
+      color: $sl-negative;
+    }
+
+    p {
+      margin: 0;
+      color: #555;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+// ── Verification Status ─────────────────────────────
+.sideloaded-verification-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &__last-checked {
+    font-size: 0.75em;
+    color: $sl-text-muted;
+  }
+}
+
+.sideloaded-verification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: help;
+
+  &__icon {
+    font-size: 1em;
+    line-height: 1;
+  }
+
+  &__label {
+    line-height: 1;
+  }
+
+  &.--success {
+    background: rgba(var(--success-rgb, 0, 128, 0), 0.1);
+    color: var(--success);
+  }
+
+  &.--accessible {
+    background: rgba(var(--tertiary-rgb, 0, 102, 204), 0.1);
+    color: var(--tertiary);
+  }
+
+  &.--danger {
+    background: rgba(var(--danger-rgb, 231, 76, 60), 0.1);
+    color: var(--danger);
+  }
+
+  &.--unknown {
+    background: rgba(108, 117, 125, 0.1);
+    color: $sl-text-muted;
+  }
+}
+
+// ── Inline Edit Mode ────────────────────────────────
+.sideloaded-review-display--editing {
+  border-color: $sl-primary;
+  box-shadow: 0 0 0 2px rgba($sl-primary, 0.15);
+}
+
+.sideloaded-review-display__edit-btn {
+  margin-left: auto;
+  font-size: 0.85em;
+}
+
+.sideloaded-review-display__edit-form {
+  .sideloaded-form__field {
+    margin-bottom: 14px;
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-size: 0.85em;
+      color: $sl-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid $sl-border;
+      border-radius: 6px;
+      font-size: 0.9em;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: $sl-primary;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba($sl-primary, 0.1);
+      }
+    }
+
+    textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+  }
+}
+
+.sideloaded-review-display__edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid $sl-border;
+}
+
+// ── Topic List customizations ───────────────────────
+.sideloaded-topic-list-icon-link {
+  display: inline-flex;
+  flex-shrink: 0;
+  text-decoration: none;
+  margin-left: 8px;
+  vertical-align: middle;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+.sideloaded-topic-list-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid $sl-border;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.sideloaded-dev-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: rgba(46, 125, 50, 0.15);
+  color: #2e7d32;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.sideloaded-app-category-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  margin-right: 6px;
+  border-radius: 10px;
+  background: rgba($sl-primary, 0.1);
+  color: $sl-primary;
+  font-size: 0.75em;
+  font-weight: 500;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.sideloaded-topic-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 0.85em;
+  vertical-align: middle;
+
+  &.no-ratings {
+    opacity: 0.6;
+  }
+
+  &__stars {
+    color: $sl-star-color;
+    font-size: 1em;
+  }
+
+  &__value {
+    font-weight: 600;
+    color: #333;
+
+    .no-ratings & {
+      font-weight: 400;
+      color: $sl-text-muted;
+      font-size: 0.9em;
+    }
+  }
+
+  &__count {
+    color: $sl-text-muted;
+    font-size: 0.85em;
+  }
+}
+
+.sideloaded-review-display__avg-rating.--empty {
+  font-size: 0.9em;
+  color: $sl-text-muted;
+  font-style: italic;
+}
+
+.sideloaded-review-display__avg-stars {
+  color: $sl-star-color;
+  margin-right: 2px;
+}
+
+// ── Responsive ──────────────────────────────────────
+@media (max-width: 768px) {
+  .sideloaded-review-display {
+    padding: 16px;
+
+    &__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    &__info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    &__download-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__download-meta {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    &__screenshot-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+// ── Review Queue Preview ────────────────────────────
+.sideloaded-reviewable-preview {
+  margin-top: 1em;
+  padding: 1em;
+  border: 1px solid var(--primary-low);
+  border-radius: 8px;
+  background: var(--secondary);
+
+  &__title {
+    margin: 0 0 0.75em;
+    font-size: var(--font-up-1);
+    color: var(--primary);
+    border-bottom: 1px solid var(--primary-low);
+    padding-bottom: 0.5em;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75em 1.5em;
+    margin-bottom: 1em;
+  }
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+  }
+
+  &__label {
+    font-size: var(--font-down-1);
+    font-weight: 600;
+    color: var(--primary-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  &__value {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    color: var(--primary);
+  }
+
+  &__icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+
+  &__link {
+    color: var(--tertiary);
+    word-break: break-all;
+  }
+
+  &__stars {
+    color: #f5a623;
+    font-size: var(--font-up-1);
+    letter-spacing: 1px;
+  }
+
+  &__checksum {
+    font-size: var(--font-down-1);
+    word-break: break-all;
+  }
+
+  &__section {
+    margin-top: 0.75em;
+  }
+
+  &__text {
+    margin: 0.25em 0 0;
+    white-space: pre-wrap;
+    color: var(--primary-high);
+  }
+
+  &__screenshots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    margin-top: 0.4em;
+  }
+
+  &__screenshot {
+    max-width: 120px;
+    max-height: 200px;
+    border-radius: 4px;
+    border: 1px solid var(--primary-low);
+  }
+}
