@@ -84,6 +84,7 @@ class ::ApkReviewsController < ::ApplicationController
 
     if review.update(review_params)
       create_edit_audit_post(review, old_attrs)
+      protect_screenshot_uploads(review)
 
       # When APK link changes, re-verify and update the verification record
       verification_data = nil
@@ -500,6 +501,31 @@ class ::ApkReviewsController < ::ApplicationController
   rescue => e
     Rails.logger.warn("[Sideloaded Apps] Verification after edit failed for topic #{review.topic_id}: #{e.message}")
     nil
+  end
+
+  def protect_screenshot_uploads(review)
+    urls = review.screenshot_urls
+    return if urls.blank?
+
+    post = Post.find_by(topic_id: review.topic_id, post_number: 1)
+    return unless post
+
+    upload_ids = urls.filter_map do |url|
+      sha1 = Upload.sha1_from_short_url(url) || Upload.sha1_from_long_url(url)
+      upload = sha1 && Upload.find_by(sha1: sha1)
+      upload ||= Upload.find_by("url LIKE ?", "%#{url.split("/").last(3).join("/")}")
+      upload&.id
+    end
+
+    return if upload_ids.empty?
+
+    upload_ids.each do |uid|
+      UploadReference.find_or_create_by!(upload_id: uid, target: post)
+    rescue ActiveRecord::RecordNotUnique
+      # already exists
+    end
+  rescue => e
+    Rails.logger.warn("[Sideloaded Apps] Failed to protect screenshot uploads for topic #{review.topic_id}: #{e.message}")
   end
 
   FIELD_LABELS = {

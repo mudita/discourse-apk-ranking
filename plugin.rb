@@ -39,6 +39,38 @@ after_initialize do
 
   register_post_custom_field_type("apk_rating", :integer)
 
+  # ── Helper: protect screenshot uploads from cleanup ──
+  # Discourse deletes uploads without UploadReference records.
+  # Screenshots stored only in ApkReview.screenshot_urls would be
+  # considered orphaned, so we create UploadReference entries linking
+  # each upload to the topic's first post.
+  def self.ensure_screenshot_upload_references(topic_id, screenshot_urls)
+    return if screenshot_urls.blank?
+
+    post = Post.find_by(topic_id: topic_id, post_number: 1)
+    return unless post
+
+    upload_ids = screenshot_urls.filter_map do |url|
+      sha1 = Upload.sha1_from_short_url(url) || Upload.sha1_from_long_url(url)
+      upload = sha1 && Upload.find_by(sha1: sha1)
+      upload ||= Upload.find_by("url LIKE ?", "%#{url.split("/").last(3).join("/")}")
+      upload&.id
+    end
+
+    return if upload_ids.empty?
+
+    existing_ids = UploadReference.where(target: post).pluck(:upload_id)
+    new_ids = upload_ids - existing_ids
+
+    new_ids.each do |uid|
+      UploadReference.create!(upload_id: uid, target: post)
+    rescue ActiveRecord::RecordNotUnique
+      # already exists — safe to ignore
+    end
+  rescue => e
+    Rails.logger.warn("[Sideloaded Apps] Failed to create upload references for topic #{topic_id}: #{e.message}")
+  end
+
   add_to_serializer(:reviewable_queued_post, :apk_review_data) do
     topic_opts = object.payload&.dig("topic_opts") || {}
     cf = topic_opts["custom_fields"] || {}
@@ -388,6 +420,8 @@ after_initialize do
       last_access_date: Time.current,
     )
 
+    ensure_screenshot_upload_references(topic.id, screenshot_urls)
+
     tag_name = "app-#{app_category}"
     DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), [tag_name], append: true)
 
@@ -497,6 +531,8 @@ after_initialize do
       screenshot_urls: screenshot_urls,
       last_access_date: Time.current,
     )
+
+    ensure_screenshot_upload_references(topic.id, screenshot_urls)
 
     tag_name = "app-#{app_category}"
     DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), [tag_name], append: true)
