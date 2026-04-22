@@ -4,7 +4,7 @@ en:
   sideloaded_apps:
     errors:
       not_found: "Review not found"
-      not_in_category: "This topic is not in the Sideloaded Apps Ranking category"
+      not_in_category: "This topic is not in the Community Apps Ranking category"
     report_outdated:
       pm_title: "Outdated version report: %{app_name}"
       pm_body: |

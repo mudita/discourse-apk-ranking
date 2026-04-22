@@ -2,11 +2,11 @@ plugins:
   sideloaded_apps_ranking_enabled:
     default: true
     client: true
-    description: "Enable the Sideloaded Apps Ranking plugin"
+    description: "Enable the Community Apps Ranking plugin"
   sideloaded_apps_category_slug:
     default: "sideloaded-apps-ranking"
     client: true
-    description: "Slug of the category used for the Sideloaded Apps Ranking (must match the category you create)"
+    description: "Slug of the category used for the Community Apps Ranking (must match the category you create)"
   sideloaded_apps_verification_enabled:
     default: true
     client: true

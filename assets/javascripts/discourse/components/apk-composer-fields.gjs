@@ -163,11 +163,23 @@ export default class ApkComposerFields extends Component {
     }
   }
 
+  _normalizeChecksum(raw) {
+    return (raw ?? "")
+      .trim()
+      .replace(/^sha-?256\s*[:=]\s*/i, "")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+  }
+
   _computeFieldError(field) {
     const name = this.appName?.trim() ?? "";
     const link = this.apkLink?.trim() ?? "";
     const version = this.apkVersion?.trim() ?? "";
     const desc = this.appDescription?.trim() ?? "";
+
+    // Accepts 1, 1.2, 1.2.3, v1.2.3, 1.2.3-beta, 1.2.3+build.5, 1.2.3 (456)
+    const versionPattern =
+      /^v?\d+(?:\.\d+){0,4}(?:[-+][0-9A-Za-z][0-9A-Za-z.+-]*)?(?:\s*\(\d+\))?$/;
 
     switch (field) {
       case "appName":
@@ -198,7 +210,21 @@ export default class ApkComposerFields extends Component {
         if (!version) {
           return i18n("sideloaded_apps.form.validation.apk_version_required");
         }
+        if (!versionPattern.test(version)) {
+          return i18n("sideloaded_apps.form.validation.apk_version_invalid");
+        }
         return null;
+      case "apkChecksum": {
+        const rawChecksum = this.apkChecksum?.trim() ?? "";
+        if (!rawChecksum) {
+          return null;
+        }
+        const normalized = this._normalizeChecksum(rawChecksum);
+        if (!/^[a-f0-9]{64}$/.test(normalized)) {
+          return i18n("sideloaded_apps.form.validation.checksum_invalid");
+        }
+        return null;
+      }
       case "authorRating":
         if (
           !this.authorRating ||
@@ -229,17 +255,18 @@ export default class ApkComposerFields extends Component {
   }
 
   validateAll() {
-    const MANDATORY_FIELDS = [
+    const FIELDS = [
       "appName",
       "appCategory",
       "apkLink",
       "apkVersion",
+      "apkChecksum",
       "authorRating",
       "appDescription",
     ];
 
     const errors = {};
-    for (const field of MANDATORY_FIELDS) {
+    for (const field of FIELDS) {
       errors[field] = this._computeFieldError(field);
     }
 
@@ -393,7 +420,7 @@ export default class ApkComposerFields extends Component {
       this.model.set("title", `${name} review by ${authorName}`);
     }
 
-    const parts = [`**${name || "App"}** — Sideloaded App Review`];
+    const parts = [`**${name || "App"}** — Community App Review`];
     if (version) {
       parts.push(`Version: ${version}`);
     }
@@ -405,12 +432,17 @@ export default class ApkComposerFields extends Component {
     this.model.notifyPropertyChange("reply");
     this.model.notifyPropertyChange("title");
 
+    const normalizedChecksum = this._normalizeChecksum(this.apkChecksum);
+    const checksumForSave = /^[a-f0-9]{64}$/.test(normalizedChecksum)
+      ? normalizedChecksum
+      : this.apkChecksum.trim();
+
     _pendingApkData = {
       app_name: this.appName.trim(),
       app_category: this.appCategory,
       apk_link: this.apkLink.trim(),
       apk_version: this.apkVersion.trim(),
-      apk_checksum: this.apkChecksum.trim(),
+      apk_checksum: checksumForSave,
       author_rating: this.authorRating,
       app_description: this.appDescription.trim(),
       known_issues: this.knownIssues.trim(),
@@ -431,7 +463,7 @@ export default class ApkComposerFields extends Component {
       apk_author_rating: String(this.authorRating),
       apk_description: this.appDescription.trim(),
       apk_known_issues: this.knownIssues.trim(),
-      apk_checksum: this.apkChecksum.trim(),
+      apk_checksum: checksumForSave,
       apk_screenshot_urls: JSON.stringify(screenshotUrls),
       apk_author_is_developer: this.authorIsDeveloper ? "true" : "false",
       apk_icon_url: this.iconUrl.trim() || "",
@@ -451,6 +483,7 @@ export default class ApkComposerFields extends Component {
       "appName",
       "apkLink",
       "apkVersion",
+      "apkChecksum",
       "appDescription",
     ];
     if (validateOnChange.includes(field)) {
@@ -458,6 +491,19 @@ export default class ApkComposerFields extends Component {
     } else if (field === "appCategory") {
       this.validateField(field);
     }
+  }
+
+  @action
+  normalizeChecksumField() {
+    const raw = this.apkChecksum?.trim() ?? "";
+    if (raw) {
+      const normalized = this._normalizeChecksum(raw);
+      if (/^[a-f0-9]{64}$/.test(normalized) && normalized !== raw) {
+        this.apkChecksum = normalized;
+        this._syncToModel();
+      }
+    }
+    this.validateField("apkChecksum");
   }
 
   @action
@@ -481,22 +527,16 @@ export default class ApkComposerFields extends Component {
 
   <template>
     <div class="sideloaded-composer-fields">
-      <h3 class="sideloaded-composer-fields__title">{{i18n
-          "sideloaded_apps.form.title"
-        }}</h3>
-
       <div
         class="sideloaded-form__field
           {{if this.fieldErrors.appName '--has-error'}}"
       >
-        <label for="sl-composer-app-name">{{i18n
-            "sideloaded_apps.form.app_name"
-          }}</label>
         <input
           id="sl-composer-app-name"
           type="text"
           value={{this.appName}}
-          placeholder={{i18n "sideloaded_apps.form.app_name_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.app_name"}}
+          placeholder={{i18n "sideloaded_apps.form.app_name"}}
           {{on "input" (fn this.updateField "appName")}}
           {{on "blur" (fn this.validateField "appName")}}
         />
@@ -511,16 +551,14 @@ export default class ApkComposerFields extends Component {
         class="sideloaded-form__field
           {{if this.fieldErrors.appCategory '--has-error'}}"
       >
-        <label for="sl-composer-app-category">{{i18n
-            "sideloaded_apps.form.app_category"
-          }}</label>
         <select
           id="sl-composer-app-category"
+          aria-label={{i18n "sideloaded_apps.form.app_category"}}
           {{on "change" (fn this.updateField "appCategory")}}
           {{on "blur" (fn this.validateField "appCategory")}}
         >
           <option value="">{{i18n
-              "sideloaded_apps.form.app_category_placeholder"
+              "sideloaded_apps.form.app_category"
             }}</option>
           {{#each this.appCategories as |cat|}}
             <option
@@ -542,14 +580,12 @@ export default class ApkComposerFields extends Component {
         class="sideloaded-form__field
           {{if this.fieldErrors.apkLink '--has-error'}}"
       >
-        <label for="sl-composer-apk-link">{{i18n
-            "sideloaded_apps.form.apk_link"
-          }}</label>
         <input
           id="sl-composer-apk-link"
           type="url"
           value={{this.apkLink}}
-          placeholder={{i18n "sideloaded_apps.form.apk_link_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.apk_link"}}
+          placeholder={{i18n "sideloaded_apps.form.apk_link"}}
           {{on "input" (fn this.updateField "apkLink")}}
           {{on "blur" (fn this.validateField "apkLink")}}
         />
@@ -589,34 +625,41 @@ export default class ApkComposerFields extends Component {
         {{/if}}
       </div>
 
-      <div class="sideloaded-form__field">
-        <label for="sl-composer-checksum">{{i18n
-            "sideloaded_apps.form.checksum"
-          }}</label>
+      <div
+        class="sideloaded-form__field
+          {{if this.fieldErrors.apkChecksum '--has-error'}}"
+      >
         <input
           id="sl-composer-checksum"
           type="text"
           value={{this.apkChecksum}}
-          placeholder={{i18n "sideloaded_apps.form.checksum_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.checksum"}}
+          placeholder={{i18n "sideloaded_apps.form.checksum"}}
+          autocomplete="off"
+          spellcheck="false"
           {{on "input" (fn this.updateField "apkChecksum")}}
+          {{on "blur" this.normalizeChecksumField}}
         />
         <span class="sideloaded-form__help">{{i18n
             "sideloaded_apps.form.checksum_help"
           }}</span>
+        {{#if this.fieldErrors.apkChecksum}}
+          <span
+            class="sideloaded-form__error"
+          >{{this.fieldErrors.apkChecksum}}</span>
+        {{/if}}
       </div>
 
       <div
         class="sideloaded-form__field
           {{if this.fieldErrors.apkVersion '--has-error'}}"
       >
-        <label for="sl-composer-apk-version">{{i18n
-            "sideloaded_apps.form.apk_version"
-          }}</label>
         <input
           id="sl-composer-apk-version"
           type="text"
           value={{this.apkVersion}}
-          placeholder={{i18n "sideloaded_apps.form.apk_version_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.apk_version"}}
+          placeholder={{i18n "sideloaded_apps.form.apk_version"}}
           {{on "input" (fn this.updateField "apkVersion")}}
           {{on "blur" (fn this.validateField "apkVersion")}}
         />
@@ -659,14 +702,12 @@ export default class ApkComposerFields extends Component {
       </div>
 
       <div class="sideloaded-form__field">
-        <label for="sl-composer-icon-url">{{i18n
-            "sideloaded_apps.form.icon_url"
-          }}</label>
         <input
           id="sl-composer-icon-url"
           type="url"
           value={{this.iconUrl}}
-          placeholder={{i18n "sideloaded_apps.form.icon_url_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.icon_url"}}
+          placeholder={{i18n "sideloaded_apps.form.icon_url"}}
           {{on "input" (fn this.updateField "iconUrl")}}
         />
         <span class="sideloaded-form__help">{{i18n
@@ -678,13 +719,11 @@ export default class ApkComposerFields extends Component {
         class="sideloaded-form__field
           {{if this.fieldErrors.appDescription '--has-error'}}"
       >
-        <label for="sl-composer-description">{{i18n
-            "sideloaded_apps.form.description"
-          }}</label>
         <textarea
           id="sl-composer-description"
           rows="5"
-          placeholder={{i18n "sideloaded_apps.form.description_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.description"}}
+          placeholder={{i18n "sideloaded_apps.form.description"}}
           {{on "input" (fn this.updateField "appDescription")}}
           {{on "blur" (fn this.validateField "appDescription")}}
         >{{this.appDescription}}</textarea>
@@ -696,13 +735,11 @@ export default class ApkComposerFields extends Component {
       </div>
 
       <div class="sideloaded-form__field">
-        <label for="sl-composer-known-issues">{{i18n
-            "sideloaded_apps.form.known_issues"
-          }}</label>
         <textarea
           id="sl-composer-known-issues"
           rows="3"
-          placeholder={{i18n "sideloaded_apps.form.known_issues_placeholder"}}
+          aria-label={{i18n "sideloaded_apps.form.known_issues"}}
+          placeholder={{i18n "sideloaded_apps.form.known_issues"}}
           {{on "input" (fn this.updateField "knownIssues")}}
         >{{this.knownIssues}}</textarea>
       </div>

@@ -40,10 +40,16 @@ export default apiInitializer((api) => {
     name: "sideloaded-apps",
     displayName: i18n("sideloaded_apps.nav_label"),
     href: `/c/${categorySlug}`,
-    customFilter: (category) => !category,
-    forceActive: (category, args, router) =>
-      router.currentURL?.includes(`/c/${categorySlug}`),
   });
+
+  // Hide the Sideloaded Apps entry from the homepage `.filter-category-boxes`.
+  // The theme connector renders each anchor with a class equal to the category slug.
+  if (categorySlug && !document.getElementById("sideloaded-hide-category-box")) {
+    const style = document.createElement("style");
+    style.id = "sideloaded-hide-category-box";
+    style.textContent = `.filter-category-boxes a.${categorySlug} { display: none !important; }`;
+    document.head.appendChild(style);
+  }
 
   // ── 2. HOMEPAGE BANNER ─────────────────────────────
   api.renderInOutlet(
@@ -60,9 +66,14 @@ export default apiInitializer((api) => {
       <template>
         <div class="sideloaded-apps-banner">
           <div class="sideloaded-apps-banner__content">
-            <h3 class="sideloaded-apps-banner__title">{{i18n
-                "sideloaded_apps.banner.title"
-              }}</h3>
+            <h3 class="sideloaded-apps-banner__title">
+              <span
+                class="sideloaded-apps-banner__title-line"
+              >{{i18n "sideloaded_apps.banner.title_line1"}}</span>
+              <span
+                class="sideloaded-apps-banner__title-line"
+              >{{i18n "sideloaded_apps.banner.title_line2"}}</span>
+            </h3>
             <p class="sideloaded-apps-banner__text">{{i18n
                 "sideloaded_apps.banner.text"
               }}</p>
@@ -160,8 +171,6 @@ export default apiInitializer((api) => {
 
       <template>
         <div class="sideloaded-category-filter__container">
-          <h3 class="sideloaded-category-filter__title">Sideloaded Apps
-            Categories</h3>
           <div class="sideloaded-category-filter">
             <button
               type="button"
@@ -197,6 +206,28 @@ export default apiInitializer((api) => {
     }
 
     return value;
+  });
+
+  // In-composer save button label + action title for sideloaded category
+  api.customizeComposerText({
+    actionTitle(model) {
+      const slug = model?.category?.slug || model?.topic?.category?.slug;
+      if (slug !== categorySlug) {
+        return;
+      }
+      if (model?.action === "createTopic" && !getComposerInfoPostMode()) {
+        return i18n("sideloaded_apps.form.title");
+      }
+    },
+    saveLabel(model) {
+      const slug = model?.category?.slug || model?.topic?.category?.slug;
+      if (slug !== categorySlug) {
+        return;
+      }
+      if (model?.action === "createTopic" && !getComposerInfoPostMode()) {
+        return "sideloaded_apps.form.submit";
+      }
+    },
   });
 
   // ── 4. COMPOSER: Review form for new topics ────────

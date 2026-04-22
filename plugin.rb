@@ -11,6 +11,33 @@ enabled_site_setting :sideloaded_apps_ranking_enabled
 
 register_asset "stylesheets/sideloaded-apps.scss"
 
+module ::DiscourseApkRanking
+  # HTML-comment markers used to fence auto-generated content in post raw.
+  # Anything between the markers is treated as plugin-owned and gets
+  # restored on every edit (see plugin.rb `on(:post_edited)` handler).
+  PREFIX_START = "<!-- apk-prefix-start -->"
+  PREFIX_END = "<!-- apk-prefix-end -->"
+  AUDIT_START = "<!-- apk-audit-start -->"
+  AUDIT_END = "<!-- apk-audit-end -->"
+
+  # Strip every plugin-owned block (both reply-prefix and audit) from a
+  # raw string. Used when surfacing raw to the composer so the user
+  # never sees the markers — server-side hooks always re-apply the
+  # canonical block on save, so the round-trip stays consistent.
+  def self.strip_plugin_markers(raw)
+    return raw if raw.blank?
+    raw
+      .gsub(/#{Regexp.escape(PREFIX_START)}.*?#{Regexp.escape(PREFIX_END)}\s*/m, "")
+      .gsub(/#{Regexp.escape(AUDIT_START)}.*?#{Regexp.escape(AUDIT_END)}\s*/m, "")
+      .sub(/\A\s+/, "")
+  end
+
+  def self.contains_markers?(raw)
+    s = raw.to_s
+    s.include?(PREFIX_START) || s.include?(AUDIT_START)
+  end
+end
+
 register_editable_topic_custom_field(:apk_app_name)
 register_editable_topic_custom_field(:apk_app_category)
 register_editable_topic_custom_field(:apk_link)
@@ -38,6 +65,24 @@ after_initialize do
   require_relative "app/jobs/scheduled/verify_apk_links"
 
   register_post_custom_field_type("apk_rating", :integer)
+  register_post_custom_field_type("apk_audit_raw", :string)
+
+  # Hide plugin-owned marker blocks from the composer when a post is
+  # loaded for editing. Server-side `on(:post_edited)` always re-applies
+  # the canonical block on save, so stripping here does not affect
+  # persistence — it only prevents the user from seeing or deleting the
+  # HTML-comment markers in the editor.
+  reloadable_patch do
+    PostSerializer.prepend(
+      Module.new do
+        def raw
+          original = super
+          return original unless ::DiscourseApkRanking.contains_markers?(original)
+          ::DiscourseApkRanking.strip_plugin_markers(original)
+        end
+      end,
+    )
+  end
 
   # ── Helper: protect screenshot uploads from cleanup ──
   # Discourse deletes uploads without UploadReference records.
@@ -589,6 +634,78 @@ after_initialize do
     Rails.logger.error("[Sideloaded Apps] Failed to process approved review for post #{post&.id}: #{e.message}")
   end
 
+  # ── Helpers for reply auto-prefix (version + rating) ──
+  def self.apk_reply_prefix_for(post, user, override_rating: nil)
+    review = ApkReview.find_by(topic_id: post.topic_id)
+    return nil unless review
+
+    is_topic_author = post.topic.user_id == user.id
+    effective_rating =
+      override_rating ||
+      (!is_topic_author ? ApkReview.user_rating_for(post.topic_id, user.id) : nil)
+
+    lines = ["> #{I18n.t("js.sideloaded_apps.reply_version_prefix")} #{review.apk_version}"]
+    if is_topic_author
+      author_stars = "\u2605" * review.author_rating + "\u2606" * (5 - review.author_rating)
+      lines << "> #{I18n.t("js.sideloaded_apps.reply_author_rating_prefix")} #{author_stars} · #{I18n.t("js.sideloaded_apps.reply_author_badge")}"
+    elsif effective_rating&.between?(1, 5)
+      stars = "\u2605" * effective_rating + "\u2606" * (5 - effective_rating)
+      lines << "> #{I18n.t("js.sideloaded_apps.reply_user_rating_prefix")} #{stars}"
+    end
+
+    "#{::DiscourseApkRanking::PREFIX_START}\n#{lines.join("\n")}\n#{::DiscourseApkRanking::PREFIX_END}\n\n"
+  end
+
+  # Normalize typographic quotes (Discourse's typographer rewrites
+  # straight ASCII apostrophes to curly ones in stored raw, so a naive
+  # string compare against the I18n key would miss them).
+  def self.apk_normalize_quotes(str)
+    str.to_s.tr("\u2018\u2019\u201B\u2032", "'").tr("\u201C\u201D\u2033", '"')
+  end
+
+  # Strip the auto-prefix block from `raw`. Primary strategy: cut
+  # everything between the HTML-comment markers, regardless of the
+  # content inside (so user edits within the block disappear on save).
+  # Fallback: for posts created before the marker was introduced (or if
+  # a user deleted the markers), drop any line containing one of the
+  # prefix labels.
+  def self.apk_strip_reply_prefix(raw)
+    return raw if raw.blank?
+
+    cleaned =
+      raw.gsub(
+        /#{Regexp.escape(::DiscourseApkRanking::PREFIX_START)}.*?#{Regexp.escape(::DiscourseApkRanking::PREFIX_END)}\s*/m,
+        "",
+      )
+
+    version_key = apk_normalize_quotes(I18n.t("js.sideloaded_apps.reply_version_prefix"))
+    user_key = apk_normalize_quotes(I18n.t("js.sideloaded_apps.reply_user_rating_prefix"))
+    author_key = apk_normalize_quotes(I18n.t("js.sideloaded_apps.reply_author_rating_prefix"))
+    prefix_keys = [version_key, user_key, author_key, "Review for version"].uniq
+
+    kept = cleaned.lines.reject do |line|
+      stripped = apk_normalize_quotes(line.strip.sub(/\A>+\s*/, ""))
+      next false if stripped.empty?
+      prefix_keys.any? { |k| stripped.include?(k) }
+    end
+
+    # Drop leading blank lines and collapse any run of 3+ consecutive
+    # newlines (left where a prefix block was removed) into 2.
+    kept.join.sub(/\A\s+/, "").gsub(/\n{3,}/, "\n\n")
+  end
+
+  # Remove the audit block (wrapped by AUDIT markers) from `raw`. Any
+  # user-added content outside the markers survives and is returned.
+  def self.apk_strip_audit_block(raw)
+    return raw if raw.blank?
+    raw
+      .gsub(
+        /#{Regexp.escape(::DiscourseApkRanking::AUDIT_START)}.*?#{Regexp.escape(::DiscourseApkRanking::AUDIT_END)}\s*/m,
+        "",
+      )
+      .sub(/\A\s+/, "")
+  end
+
   # ── Persist reply star rating + auto-prefix ──────────
   on(:post_created) do |post, opts, user|
     next unless SiteSetting.sideloaded_apps_ranking_enabled
@@ -610,28 +727,55 @@ after_initialize do
     end
 
     # Auto-prefix with version (skip for audit posts from review edits)
-    next if post.raw.include?("Review updated by")
+    next if post.raw.include?(::DiscourseApkRanking::AUDIT_START) || post.raw.include?("Review updated by")
 
-    review = ApkReview.find_by(topic_id: post.topic_id)
-    next unless review
+    prefix = apk_reply_prefix_for(post, user, override_rating: rating)
+    next unless prefix
 
-    # Use rating from this reply, or fall back to user's existing rating
-    effective_rating = rating || (!is_topic_author ? ApkReview.user_rating_for(post.topic_id, user.id) : nil)
-
-    prefix = "> #{I18n.t("js.sideloaded_apps.reply_version_prefix")} #{review.apk_version}"
-    if is_topic_author
-      author_stars = "\u2605" * review.author_rating + "\u2606" * (5 - review.author_rating)
-      prefix += "\n> #{I18n.t("js.sideloaded_apps.reply_author_rating_prefix")} #{author_stars} · #{I18n.t("js.sideloaded_apps.reply_author_badge")}"
-    elsif effective_rating&.between?(1, 5)
-      stars = "\u2605" * effective_rating + "\u2606" * (5 - effective_rating)
-      prefix += "\n> #{I18n.t("js.sideloaded_apps.reply_user_rating_prefix")} #{stars}"
-    end
-    prefix += "\n\n"
-    unless post.raw.include?("Review for version") || post.raw.include?(I18n.t("js.sideloaded_apps.reply_version_prefix"))
-      post.update_column(:raw, "#{prefix}#{post.raw}")
+    body = apk_strip_reply_prefix(post.raw)
+    new_raw = "#{prefix}#{body}"
+    if new_raw != post.raw
+      post.update_column(:raw, new_raw)
       post.rebake!
     end
   rescue => e
     Rails.logger.error("[Sideloaded Apps] Failed to process reply post #{post.id}: #{e.message}")
+  end
+
+  # ── Re-apply auto-prefix on every edit ───────────────
+  # Users must not be able to alter version/rating text or tamper with
+  # the audit block by editing the post.
+  on(:post_edited) do |post, _topic_changed, _revisor|
+    next unless SiteSetting.sideloaded_apps_ranking_enabled
+    next if post.post_number == 1
+    next unless post.topic&.category&.slug == SiteSetting.sideloaded_apps_category_slug
+
+    # Audit post (review edit history): restore canonical audit block
+    # from the custom field, keep any user-added body below.
+    audit_canonical = post.custom_fields["apk_audit_raw"]
+    if audit_canonical.present?
+      body = apk_strip_audit_block(post.raw)
+      canonical = audit_canonical.sub(/\s*\z/, "")
+      new_raw = body.blank? ? "#{canonical}\n" : "#{canonical}\n\n#{body}"
+
+      if new_raw != post.raw
+        post.update_column(:raw, new_raw)
+        post.rebake!
+      end
+      next
+    end
+
+    prefix = apk_reply_prefix_for(post, post.user)
+    next unless prefix
+
+    body = apk_strip_reply_prefix(post.raw)
+    new_raw = "#{prefix}#{body}"
+
+    if new_raw != post.raw
+      post.update_column(:raw, new_raw)
+      post.rebake!
+    end
+  rescue => e
+    Rails.logger.error("[Sideloaded Apps] Failed to re-apply prefix on edited post #{post&.id}: #{e.message}")
   end
 end

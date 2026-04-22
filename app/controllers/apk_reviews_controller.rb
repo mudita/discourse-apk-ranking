@@ -43,7 +43,7 @@ class ::ApkReviewsController < ::ApplicationController
     end
 
     unless topic.category&.slug == SiteSetting.sideloaded_apps_category_slug
-      return render json: { error: "Topic must be in the Sideloaded Apps Ranking category" }, status: 422
+      return render json: { error: "Topic must be in the Community Apps Ranking category" }, status: 422
     end
 
     unless current_user.id == topic.user_id || current_user.staff?
@@ -553,16 +553,23 @@ class ::ApkReviewsController < ::ApplicationController
 
     return if changes.empty?
 
-    raw = "> **Review updated by @#{current_user.username}**\n>\n"
-    raw += changes.map { |c| "> #{c}" }.join("\n")
-    raw += "\n>\n> [View current review](#post_1)"
+    audit_body = "> **Review updated by @#{current_user.username}**\n>\n"
+    audit_body += changes.map { |c| "> #{c}" }.join("\n")
+    audit_body += "\n>\n> [View current review](#post_1)"
 
-    PostCreator.create!(
-      current_user,
-      topic_id: review.topic_id,
-      raw: raw,
-      skip_validations: true,
-    )
+    canonical = "#{::DiscourseApkRanking::AUDIT_START}\n#{audit_body}\n#{::DiscourseApkRanking::AUDIT_END}"
+    raw = "#{canonical}\n"
+
+    post =
+      PostCreator.create!(
+        current_user,
+        topic_id: review.topic_id,
+        raw: raw,
+        skip_validations: true,
+      )
+
+    post.custom_fields["apk_audit_raw"] = canonical
+    post.save_custom_fields
   rescue => e
     Rails.logger.error("[Sideloaded Apps] Failed to create audit post for topic #{review.topic_id}: #{e.message}")
   end

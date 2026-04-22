@@ -259,6 +259,14 @@ export default class ApkReviewDisplay extends Component {
     this._editMode = false;
   }
 
+  _normalizeChecksum(raw) {
+    return (raw ?? "")
+      .trim()
+      .replace(/^sha-?256\s*[:=]\s*/i, "")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+  }
+
   _validateEditField(field) {
     if (!this._touchedFields.has(field)) {
       return;
@@ -266,11 +274,19 @@ export default class ApkReviewDisplay extends Component {
 
     let error = null;
     switch (field) {
-      case "_editVersion":
-        if (!this._editVersion.trim()) {
+      case "_editVersion": {
+        const version = this._editVersion.trim();
+        if (!version) {
           error = i18n("sideloaded_apps.form.validation.apk_version_required");
+        } else {
+          const versionPattern =
+            /^v?\d+(?:\.\d+){0,4}(?:[-+][0-9A-Za-z][0-9A-Za-z.+-]*)?(?:\s*\(\d+\))?$/;
+          if (!versionPattern.test(version)) {
+            error = i18n("sideloaded_apps.form.validation.apk_version_invalid");
+          }
         }
         break;
+      }
       case "_editLink":
         if (!this._editLink.trim()) {
           error = i18n("sideloaded_apps.form.validation.required");
@@ -278,6 +294,13 @@ export default class ApkReviewDisplay extends Component {
           error = i18n("sideloaded_apps.form.validation.apk_link_url");
         }
         break;
+      case "_editChecksum": {
+        const normalized = this._normalizeChecksum(this._editChecksum);
+        if (normalized && !/^[a-f0-9]{64}$/.test(normalized)) {
+          error = i18n("sideloaded_apps.form.validation.checksum_invalid");
+        }
+        break;
+      }
       case "_editDescription":
         if (!this._editDescription.trim()) {
           error = i18n("sideloaded_apps.form.validation.required");
@@ -294,6 +317,16 @@ export default class ApkReviewDisplay extends Component {
         break;
     }
     this._editFieldErrors = { ...this._editFieldErrors, [field]: error };
+  }
+
+  @action
+  normalizeEditChecksum() {
+    const normalized = this._normalizeChecksum(this._editChecksum);
+    if (normalized && /^[a-f0-9]{64}$/.test(normalized)) {
+      this._editChecksum = normalized;
+    }
+    this._touchedFields.add("_editChecksum");
+    this._validateEditField("_editChecksum");
   }
 
   @action
@@ -376,6 +409,7 @@ export default class ApkReviewDisplay extends Component {
       "_editVersion",
       "_editLink",
       "_editDescription",
+      "_editChecksum",
     ];
     if (fieldsToValidateOnChange.includes(field)) {
       this._scheduleEditValidate(field);
@@ -406,7 +440,17 @@ export default class ApkReviewDisplay extends Component {
       return;
     }
 
-    this._touchedFields.forEach((f) => this._validateEditField(f));
+    const allEditFields = [
+      "_editVersion",
+      "_editLink",
+      "_editDescription",
+      "_editRating",
+      "_editChecksum",
+    ];
+    allEditFields.forEach((f) => {
+      this._touchedFields.add(f);
+      this._validateEditField(f);
+    });
     if (this._hasEditErrors) {
       return;
     }
@@ -604,9 +648,16 @@ export default class ApkReviewDisplay extends Component {
               <label>{{i18n "sideloaded_apps.form.checksum"}}</label>
               <input
                 type="text"
+                autocomplete="off"
                 value={{this._editChecksum}}
                 {{on "input" (fn this.updateEditField "_editChecksum")}}
+                {{on "blur" this.normalizeEditChecksum}}
               />
+              {{#if this._editFieldErrors._editChecksum}}
+                <span
+                  class="sideloaded-form__error"
+                >{{this._editFieldErrors._editChecksum}}</span>
+              {{/if}}
             </div>
 
             <div class="sideloaded-form__field">

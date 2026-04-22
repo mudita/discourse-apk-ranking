@@ -1,5 +1,3 @@
-@use "sass:color";
-
 $sl-primary: #06c;
 $sl-star-color: #f1c40f;
 $sl-star-empty: #ddd;
@@ -10,13 +8,9 @@ $sl-radius: 8px;
 $sl-negative: #e74c3c;
 
 // ── Composer: hide standard fields + scrollable form when review active ──
-// Uses var(--composer-height) so layout adapts to grippie drag resize
+// Keep grippie drag functional — don't override --composer-height with !important.
 body.sideloaded-composer-active {
   #reply-control {
-    .composer-action-title {
-      display: none !important;
-    }
-
     .title-and-category {
       display: none !important;
     }
@@ -30,47 +24,39 @@ body.sideloaded-composer-active {
     }
   }
 
-  // Ensure form scrolls and submit buttons stay visible at all resolutions
-  // and when user resizes composer via grippie (var(--composer-height) updates)
+  // A soft default minimum so the form has room on first open.
+  // No !important so the grippie drag (which writes --composer-height inline)
+  // still wins and touch resize works normally.
   #reply-control.open {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
+    min-height: clamp(520px, 68vh, 760px);
 
     .reply-area {
-      display: flex !important;
-      flex-direction: column !important;
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .wmd-controls {
-      display: flex !important;
-      flex-direction: column !important;
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .d-editor,
     .d-editor-container,
     .d-editor-textarea-column {
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      overflow: hidden;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
+    // Single scrollable container — outer .composer-fields handles overflow.
     .composer-fields {
-      flex: 1 1 auto !important;
-      min-height: 0 !important;
-      overflow-y: auto !important;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
       overflow-x: hidden;
-      max-height: calc(var(--composer-height, 400px) - 180px);
-    }
-
-    .submit-panel {
-      flex-shrink: 0 !important;
     }
   }
 }
@@ -138,103 +124,115 @@ body.sideloaded-apps-topic {
   &__content {
     display: flex;
     align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+
+    @media (width <= 768px) {
+      flex-direction: column;
+    }
   }
 
   &__title {
     margin: 0;
-    font-size: 1.15em;
-    font-weight: 600;
-    color: $sl-primary;
+    font-family: Facto, sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #000;
+    line-height: 1.15;
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+  }
+
+  &__title-line {
+    display: block;
   }
 
   &__text {
     margin: 0;
-    flex: 1;
-    min-width: 200px;
     font-size: 0.93em;
     color: $sl-text-muted;
+    text-align: left;
+
+    @media (width <= 768px) {
+      text-align: center;
+    }
   }
 
   &__link {
     white-space: nowrap;
+    font-family: Facto, sans-serif;
+    font-size: 13px;
+    color: #fff;
+
+    &:hover,
+    &:focus {
+      color: #fff;
+    }
   }
 }
 
 .sideloaded-category-filter__container {
   padding: 12px 10px;
   border-radius: 8px;
-  border: 1px solid #00000040;
-  margin-top: 32px;
-
-  .sideloaded-category-filter__title {
-    font-family: Facto, sans-serif;
-    font-size: 18px;
-    font-weight: 400;
-    color: #000;
-    text-align: center;
-  }
+  margin-top: 12px;
 }
 
-// ── Hide Latest/Popular nav + category boxes on sideloaded apps page ──
+// ── Hide default category list + keep only our pills on sideloaded apps page ──
 body.sideloaded-apps-category {
-  #navigation-bar.nav.nav-pills {
-    display: none !important;
-  }
-
   .filter-category-boxes {
     display: none !important;
   }
 
   .navigation-container {
     justify-content: flex-end;
+    margin-bottom: 4px;
+  }
+
+  .list-controls {
+    margin-bottom: 4px;
+    padding-bottom: 0;
   }
 }
 
-// ── Category Filter Pills ────────────────────────────
+// ── Category Filter Pills (mirrors .filter-category-boxes look) ──
 .sideloaded-category-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 12px 0;
-  justify-content: center;
+  gap: 5px;
+  margin-bottom: 0;
+  padding: 0;
+  justify-content: flex-start;
 
   &__pill {
-    display: inline-block;
-    padding: 5px 14px;
-    border-radius: 16px;
-    border: 1px solid $sl-border;
-    background: white;
-    color: #555;
-    font-size: 0.85em;
-    font-weight: 500;
-    text-decoration: none;
-    cursor: pointer;
-    transition:
-      background 0.2s,
-      color 0.2s,
-      border-color 0.2s;
+    font-family: Facto, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.7em;
+    font-weight: 400;
     white-space: nowrap;
+    border: 2px solid rgb(242, 247, 249);
+    border-radius: 20.5px;
+    color: rgb(81, 123, 152);
+    background: none;
+    padding: 3px 20px;
+    margin: 0;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
 
     &:hover {
-      background: rgba($sl-primary, 0.06);
-      border-color: rgba($sl-primary, 0.3);
-      color: $sl-primary;
+      background-color: rgb(81, 123, 152);
+      color: white;
       text-decoration: none;
     }
 
     &.active {
-      background: $sl-primary;
-      border-color: $sl-primary;
+      background-color: rgb(81, 123, 152);
       color: white;
       cursor: default;
-
-      &:hover {
-        background: color.adjust($sl-primary, $lightness: -8%);
-        color: white;
-      }
     }
   }
 }
@@ -253,80 +251,114 @@ $apk-categories:
 }
 
 // ── Composer Review Fields ──────────────────────────
-body.sideloaded-composer-active {
-  .sideloaded-composer-fields {
-    max-height: calc(100vh - 240px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
 .sideloaded-composer-fields {
-  padding: 16px;
-  margin: 8px 0;
-  padding-bottom: 24px;
+  padding: 16px 16px 24px;
+  margin: 0 0 8px;
   border: 1px solid $sl-border;
   border-radius: $sl-radius;
   background: $sl-bg-light;
+  overflow: visible;
+}
 
-  &__title {
-    margin: 0 0 14px;
-    font-size: 1.1em;
-    font-weight: 600;
-    color: $sl-primary;
+// ── Composer action title (when a sideloaded review is being created) ──
+body.sideloaded-composer-active #reply-control .composer-action-title {
+  .action-title {
+    font-family: Facto, sans-serif;
+    font-size: 22px;
+    color: #000;
+    line-height: 1.2;
   }
 }
 
 .sideloaded-form__field {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 
   label {
     display: block;
     margin-bottom: 6px;
+    font-family: Facto, sans-serif;
     font-weight: 500;
-    font-size: 0.9em;
-    color: #333;
+    font-size: 0.9rem;
+    color: var(--black, #000);
   }
 
   input[type="text"],
   input[type="url"],
+  input[type="number"],
+  input[type="email"],
   select,
   textarea {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid $sl-border;
-    border-radius: 6px;
-    font-size: 0.9em;
+    min-height: 48px;
+    padding: 0 20px;
+    font-family: Montserrat, sans-serif;
+    font-size: 1rem;
+    font-weight: 300;
+    line-height: 1em;
+    color: rgb(0, 0, 0, 0.9);
+    background: var(--secondary, #fff);
+    border: 1px solid rgb(0, 0, 0, 0.1);
+    border-radius: var(--border-radius, 8px);
+    box-shadow: 0 2px 10px 0 rgb(46, 53, 57, 0.15);
     box-sizing: border-box;
-    transition: border-color 0.2s;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+
+    &::placeholder {
+      color: rgb(0, 0, 0, 0.45);
+      font-weight: 300;
+    }
 
     &:focus {
-      border-color: $sl-primary;
+      border-color: rgb(0, 0, 0, 0.3);
       outline: none;
-      box-shadow: 0 0 0 3px rgba($sl-primary, 0.1);
+      box-shadow:
+        0 2px 10px 0 rgb(46, 53, 57, 0.15),
+        0 0 0 3px rgba($sl-primary, 0.12);
     }
   }
 
   textarea {
-    min-height: 60px;
+    min-height: 110px;
+    padding: 14px 20px;
+    line-height: 1.5;
     resize: vertical;
   }
 
   select {
     appearance: auto;
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%23517b98' d='M5.5 7.5l4.5 5 4.5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+  }
+
+  &--checkbox label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: Montserrat, sans-serif;
+    font-weight: 300;
+    font-size: 1rem;
+    color: rgb(0, 0, 0, 0.9);
   }
 
   &.--has-error {
     input[type="text"],
     input[type="url"],
+    input[type="number"],
+    input[type="email"],
     select,
     textarea {
       border-color: $sl-negative;
 
       &:focus {
         border-color: $sl-negative;
-        box-shadow: 0 0 0 3px rgba($sl-negative, 0.15);
+        box-shadow:
+          0 2px 10px 0 rgb(46, 53, 57, 0.15),
+          0 0 0 3px rgba($sl-negative, 0.15);
       }
     }
 

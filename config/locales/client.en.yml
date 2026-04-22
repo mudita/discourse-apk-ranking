@@ -1,15 +1,17 @@
 en:
   js:
     sideloaded_apps:
-      title: "Sideloaded Apps Ranking"
+      title: "Kompakt Community Apps Ranking"
       subtitle: "Community-rated apps for Mudita Kompakt"
-      nav_label: "Sideloaded Apps"
+      nav_label: "Community Apps"
       new_review: "New Review"
 
       banner:
-        title: "Sideloaded Apps Ranking"
+        title: "Kompakt Community Apps Ranking"
+        title_line1: "Kompakt Community"
+        title_line2: "Apps Ranking"
         text: "Discover community-rated apps for your Kompakt. Share your experience and rate the best sideloaded apps!"
-        cta: "Browse Sideloaded Apps"
+        cta: "Browse Apps"
 
       composer:
         validation_error: "Please fill in all required fields: Application Name, Category, APK Link, Version, Rating, and Description."
@@ -58,6 +60,8 @@ en:
           app_name_max: "Application name must be at most 100 characters"
           apk_link_url: "Please enter a valid URL (http or https)"
           apk_version_required: "Version is required (e.g. 1.0.0)"
+          apk_version_invalid: "Use a version number like 1.2.3, v1.4 or 6.45.2-beta"
+          checksum_invalid: "SHA-256 checksum must be exactly 64 hexadecimal characters (0-9, a-f)"
           description_min: "Description must be at least 20 characters"
           rating_required: "Please select a rating (1-5 stars)"
           category_required: "Please select a category"
@@ -71,7 +75,7 @@ en:
         validation_error: "Please select a star rating (1-5) for your comment."
 
       categories:
-        all: "All Categories"
+        all: "All"
         communication: "Communication"
         social: "Social"
         productivity: "Productivity"
@@ -109,7 +113,7 @@ en:
 
       last_access_date: "Last Successful Access"
       last_access_never: "Not yet accessed"
-      review_placeholder: "[Sideloaded App Review]"
+      review_placeholder: "[Community App Review]"
       reply_version_prefix: "Review for version"
       reply_user_rating_prefix: "User rating:"
       reply_author_rating_prefix: "Author's rating:"
@@ -169,7 +173,7 @@ en:
         title: "Top 5 Apps"
 
       errors:
-        not_in_category: "This topic is not in the Sideloaded Apps Ranking category"
+        not_in_category: "This topic is not in the Community Apps Ranking category"
         already_exists: "A review already exists for this topic"
         not_found: "Review not found"
         unauthorized: "You are not authorized to perform this action"
