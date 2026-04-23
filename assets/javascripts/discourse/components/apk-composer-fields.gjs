@@ -371,6 +371,10 @@ export default class ApkComposerFields extends Component {
     return this.args.model;
   }
 
+  get isChecksumDisabled() {
+    return this.linkIsDirectDownload === false;
+  }
+
   get appCategories() {
     return [
       {
@@ -433,9 +437,12 @@ export default class ApkComposerFields extends Component {
     this.model.notifyPropertyChange("title");
 
     const normalizedChecksum = this._normalizeChecksum(this.apkChecksum);
-    const checksumForSave = /^[a-f0-9]{64}$/.test(normalizedChecksum)
-      ? normalizedChecksum
-      : this.apkChecksum.trim();
+    const isWebpage = this.linkIsDirectDownload === false;
+    const checksumForSave = isWebpage
+      ? ""
+      : /^[a-f0-9]{64}$/.test(normalizedChecksum)
+        ? normalizedChecksum
+        : this.apkChecksum.trim();
 
     _pendingApkData = {
       app_name: this.appName.trim(),
@@ -625,30 +632,32 @@ export default class ApkComposerFields extends Component {
         {{/if}}
       </div>
 
-      <div
-        class="sideloaded-form__field
-          {{if this.fieldErrors.apkChecksum '--has-error'}}"
-      >
-        <input
-          id="sl-composer-checksum"
-          type="text"
-          value={{this.apkChecksum}}
-          aria-label={{i18n "sideloaded_apps.form.checksum"}}
-          placeholder={{i18n "sideloaded_apps.form.checksum"}}
-          autocomplete="off"
-          spellcheck="false"
-          {{on "input" (fn this.updateField "apkChecksum")}}
-          {{on "blur" this.normalizeChecksumField}}
-        />
-        <span class="sideloaded-form__help">{{i18n
-            "sideloaded_apps.form.checksum_help"
-          }}</span>
-        {{#if this.fieldErrors.apkChecksum}}
-          <span
-            class="sideloaded-form__error"
-          >{{this.fieldErrors.apkChecksum}}</span>
-        {{/if}}
-      </div>
+      {{#unless this.isChecksumDisabled}}
+        <div
+          class="sideloaded-form__field
+            {{if this.fieldErrors.apkChecksum '--has-error'}}"
+        >
+          <input
+            id="sl-composer-checksum"
+            type="text"
+            value={{this.apkChecksum}}
+            aria-label={{i18n "sideloaded_apps.form.checksum"}}
+            placeholder={{i18n "sideloaded_apps.form.checksum"}}
+            autocomplete="off"
+            spellcheck="false"
+            {{on "input" (fn this.updateField "apkChecksum")}}
+            {{on "blur" this.normalizeChecksumField}}
+          />
+          <span class="sideloaded-form__help">{{i18n
+              "sideloaded_apps.form.checksum_help"
+            }}</span>
+          {{#if this.fieldErrors.apkChecksum}}
+            <span
+              class="sideloaded-form__error"
+            >{{this.fieldErrors.apkChecksum}}</span>
+          {{/if}}
+        </div>
+      {{/unless}}
 
       <div
         class="sideloaded-form__field

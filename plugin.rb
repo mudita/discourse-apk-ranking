@@ -381,14 +381,21 @@ after_initialize do
     results
   end
 
-  # ── Topic list ordering by community rating ─────────
+  # ── Topic list ordering ─────────────────────────────
   register_modifier(:topic_query_apply_ordering_result) do |result, sort_column, sort_dir, options, topic_query|
     category_id = topic_query.options[:category_id]
     category_slug = category_id ? Category.where(id: category_id).pick(:slug) : nil
 
-    if category_slug == SiteSetting.sideloaded_apps_category_slug &&
-         (sort_column.blank? || sort_column == "default" || sort_column == "community_rating")
-      direction = sort_dir == "ASC" ? "ASC" : "DESC"
+    next result unless category_slug == SiteSetting.sideloaded_apps_category_slug
+
+    direction = sort_dir == "ASC" ? "ASC" : "DESC"
+    pinned_first = "CASE WHEN topics.pinned_at IS NOT NULL THEN 0 ELSE 1 END ASC"
+
+    if sort_column == "default"
+      # Clicking the "Topic" column header → sort alphabetically by title
+      result.order(Arel.sql("#{pinned_first}, LOWER(topics.title) #{direction}"))
+    elsif sort_column == "community_rating"
+      # Explicit click on the Community Rating column
       result
         .joins(
           "LEFT JOIN (
@@ -413,8 +420,7 @@ after_initialize do
         )
         .order(
           Arel.sql(
-            "CASE WHEN topics.pinned_at IS NOT NULL THEN 0 ELSE 1 END ASC, " \
-            "COALESCE(community_ratings.community_avg, 0) #{direction}",
+            "#{pinned_first}, COALESCE(community_ratings.community_avg, 0) #{direction}",
           ),
         )
     else

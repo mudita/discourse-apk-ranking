@@ -17,6 +17,8 @@ import ReportOutdatedModal from "./modal/report-outdated";
 
 export default class ApkReviewDisplay extends Component {
   @service modal;
+  @service appEvents;
+  @service composer;
 
   editUppyUpload = new UppyUpload(getOwner(this), {
     id: "sideloaded-edit-screenshot-uploader",
@@ -50,6 +52,7 @@ export default class ApkReviewDisplay extends Component {
   @tracked _editFieldErrors = {};
   @tracked _editLinkValidationStatus = null;
   @tracked _editLinkValidationMessage = "";
+  @tracked _editLinkIsDirectDownload = null;
   _touchedFields = new Set();
   @tracked _reviewOverride = null;
   @tracked _verificationOverride = null;
@@ -63,6 +66,7 @@ export default class ApkReviewDisplay extends Component {
     if (!this.args.verification && this.args.review?.topic_id) {
       this._triggerVerification();
     }
+    this.appEvents.on("composer:created-post", this, "_onComposerCreatedPost");
   }
 
   willDestroy() {
@@ -72,6 +76,38 @@ export default class ApkReviewDisplay extends Component {
     }
     if (this._editLinkDebounceTimer) {
       cancel(this._editLinkDebounceTimer);
+    }
+    this.appEvents.off("composer:created-post", this, "_onComposerCreatedPost");
+  }
+
+  async _onComposerCreatedPost() {
+    const model = this.composer?.model;
+    const topicId = model?.topic?.id;
+    if (
+      !topicId ||
+      topicId !== this.review?.topic_id ||
+      model?.action !== "reply"
+    ) {
+      return;
+    }
+
+    const md = model.metaData;
+    const raw = md?.apk_rating ?? md?.get?.("apk_rating");
+    const parsed = raw ? parseInt(raw, 10) : null;
+    const newUserRating = parsed >= 1 && parsed <= 5 ? parsed : null;
+
+    if (newUserRating) {
+      this._userRating = newUserRating;
+    }
+
+    try {
+      const result = await ajax(`/sideloaded-apps/reviews/${topicId}`);
+      if (result?.review) {
+        this._communityAvgOverride = result.review.community_average;
+        this._communityCountOverride = result.review.community_count;
+      }
+    } catch {
+      // silent — values will refresh on next page load
     }
   }
 
@@ -247,6 +283,9 @@ export default class ApkReviewDisplay extends Component {
     this._touchedFields = new Set();
     this._editLinkValidationStatus = null;
     this._editLinkValidationMessage = "";
+    const linkType = this.currentVerification?.link_type;
+    this._editLinkIsDirectDownload =
+      linkType === "file" ? true : linkType === "webpage" ? false : null;
     this._editMode = true;
   }
 
@@ -295,6 +334,9 @@ export default class ApkReviewDisplay extends Component {
         }
         break;
       case "_editChecksum": {
+        if (this.isEditChecksumDisabled) {
+          break;
+        }
         const normalized = this._normalizeChecksum(this._editChecksum);
         if (normalized && !/^[a-f0-9]{64}$/.test(normalized)) {
           error = i18n("sideloaded_apps.form.validation.checksum_invalid");
@@ -378,16 +420,19 @@ export default class ApkReviewDisplay extends Component {
       .then((result) => {
         if (!result.valid) {
           this._editLinkValidationStatus = "invalid";
+          this._editLinkIsDirectDownload = null;
           this._editLinkValidationMessage =
             result.reason ||
             i18n("sideloaded_apps.link_validation.verification_failed");
         } else if (result.is_direct_download) {
           this._editLinkValidationStatus = "valid";
+          this._editLinkIsDirectDownload = true;
           this._editLinkValidationMessage = i18n(
             "sideloaded_apps.link_validation.valid"
           );
         } else {
           this._editLinkValidationStatus = "info";
+          this._editLinkIsDirectDownload = false;
           this._editLinkValidationMessage = i18n(
             "sideloaded_apps.link_validation.webpage_link"
           );
@@ -395,10 +440,15 @@ export default class ApkReviewDisplay extends Component {
       })
       .catch(() => {
         this._editLinkValidationStatus = "invalid";
+        this._editLinkIsDirectDownload = null;
         this._editLinkValidationMessage = i18n(
           "sideloaded_apps.link_validation.verification_failed"
         );
       });
+  }
+
+  get isEditChecksumDisabled() {
+    return this._editLinkIsDirectDownload === false;
   }
 
   @action
@@ -474,17 +524,22 @@ export default class ApkReviewDisplay extends Component {
         app_description: this._editDescription.trim(),
         known_issues: this._editKnownIssues.trim(),
         author_rating: this._editRating,
-        apk_checksum: this._editChecksum.trim(),
+        apk_checksum: this.isEditChecksumDisabled
+          ? ""
+          : this._editChecksum.trim(),
         screenshot_urls: this._editScreenshots.map((s) => s.url),
       };
 
-      const linkChanged =
-        this._editLink.trim() !== (this.review.apk_link || "");
+      const newLink = this._editLink.trim();
+      const newChecksum = this._editChecksum.trim();
+      const linkChanged = newLink !== (this.review.apk_link || "");
+      const checksumChanged = newChecksum !== (this.review.apk_checksum || "");
+      let isDirectDownload = this._editLinkIsDirectDownload;
 
-      if (linkChanged && this._editLink.trim()) {
+      if (linkChanged && newLink) {
         const validation = await ajax("/sideloaded-apps/validate-link", {
           type: "POST",
-          data: { url: this._editLink.trim() },
+          data: { url: newLink },
         });
 
         if (!validation.valid) {
@@ -494,22 +549,32 @@ export default class ApkReviewDisplay extends Component {
           );
         }
 
-        if (validation.is_direct_download) {
-          const checksumResult = await ajax(
-            "/sideloaded-apps/compute-checksum",
-            {
-              type: "POST",
-              data: {
-                url: this._editLink.trim(),
-                user_checksum: this._editChecksum.trim(),
-              },
-            }
-          );
+        isDirectDownload = validation.is_direct_download;
+      }
 
-          if (checksumResult.valid_download) {
-            updateData.apk_checksum = checksumResult.checksum;
-          }
+      if (newLink && isDirectDownload && (linkChanged || checksumChanged)) {
+        const checksumResult = await ajax("/sideloaded-apps/compute-checksum", {
+          type: "POST",
+          data: {
+            url: newLink,
+            user_checksum: newChecksum,
+          },
+        });
+
+        if (!checksumResult.valid_download) {
+          throw new Error(
+            checksumResult.reason ||
+              i18n("sideloaded_apps.link_validation.not_a_download")
+          );
         }
+
+        if (newChecksum && checksumResult.user_checksum_match === false) {
+          throw new Error(
+            i18n("sideloaded_apps.link_validation.checksum_mismatch")
+          );
+        }
+
+        updateData.apk_checksum = checksumResult.checksum;
       }
 
       const result = await ajax(
@@ -523,6 +588,9 @@ export default class ApkReviewDisplay extends Component {
       this._reviewOverride = result.review;
       if (result.verification) {
         this._verificationOverride = result.verification;
+      }
+      if (this.isEditChecksumDisabled) {
+        this._editChecksum = "";
       }
       this._editMode = false;
     } catch (e) {
@@ -644,21 +712,23 @@ export default class ApkReviewDisplay extends Component {
               {{/if}}
             </div>
 
-            <div class="sideloaded-form__field">
-              <label>{{i18n "sideloaded_apps.form.checksum"}}</label>
-              <input
-                type="text"
-                autocomplete="off"
-                value={{this._editChecksum}}
-                {{on "input" (fn this.updateEditField "_editChecksum")}}
-                {{on "blur" this.normalizeEditChecksum}}
-              />
-              {{#if this._editFieldErrors._editChecksum}}
-                <span
-                  class="sideloaded-form__error"
-                >{{this._editFieldErrors._editChecksum}}</span>
-              {{/if}}
-            </div>
+            {{#unless this.isEditChecksumDisabled}}
+              <div class="sideloaded-form__field">
+                <label>{{i18n "sideloaded_apps.form.checksum"}}</label>
+                <input
+                  type="text"
+                  autocomplete="off"
+                  value={{this._editChecksum}}
+                  {{on "input" (fn this.updateEditField "_editChecksum")}}
+                  {{on "blur" this.normalizeEditChecksum}}
+                />
+                {{#if this._editFieldErrors._editChecksum}}
+                  <span
+                    class="sideloaded-form__error"
+                  >{{this._editFieldErrors._editChecksum}}</span>
+                {{/if}}
+              </div>
+            {{/unless}}
 
             <div class="sideloaded-form__field">
               <label>{{i18n "sideloaded_apps.form.author_rating"}}</label>

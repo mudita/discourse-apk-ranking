@@ -306,7 +306,11 @@ class ::ApkReviewsController < ::ApplicationController
     end
     verification.last_http_status = code
 
-    if verification.availability_status == "available" && review.apk_checksum.present?
+    if verification.link_type == "webpage"
+      verification.consistency_status = "unknown"
+      verification.consistency_description = "Webpage link — checksum not applicable"
+      verification.last_computed_checksum = nil
+    elsif verification.availability_status == "available" && review.apk_checksum.present?
       checksum_result = compute_checksum_for(review.apk_link, review.apk_checksum)
       verification.consistency_status = checksum_result[:status]
       verification.consistency_description = checksum_result[:description]
@@ -474,7 +478,11 @@ class ::ApkReviewsController < ::ApplicationController
     end
     verification.last_http_status = code
 
-    if verification.availability_status == "available" && review.apk_checksum.present?
+    if verification.link_type == "webpage"
+      verification.consistency_status = "unknown"
+      verification.consistency_description = "Webpage link — checksum not applicable"
+      verification.last_computed_checksum = nil
+    elsif verification.availability_status == "available" && review.apk_checksum.present?
       checksum_result = compute_checksum_for(review.apk_link, review.apk_checksum)
       verification.consistency_status = checksum_result[:status]
       verification.consistency_description = checksum_result[:description]

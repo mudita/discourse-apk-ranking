@@ -40,7 +40,11 @@ module ::Jobs
         review.update_column(:last_access_date, Time.current)
       end
 
-      if availability[:status] == "available" && review.apk_checksum.present?
+      if verification.link_type == "webpage"
+        verification.consistency_status = "unknown"
+        verification.consistency_description = "Webpage link — checksum not applicable"
+        verification.last_computed_checksum = nil
+      elsif availability[:status] == "available" && review.apk_checksum.present?
         consistency = check_consistency(review.apk_link, review.apk_checksum, max_size)
         verification.consistency_status = consistency[:status]
         verification.consistency_description = consistency[:description]
