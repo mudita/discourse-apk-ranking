@@ -46,6 +46,9 @@ export default class ApkComposerFields extends Component {
   @tracked linkValidationMessage = "";
   @tracked linkFileSize = null;
   @tracked linkIsDirectDownload = null;
+  @tracked iconValidationStatus = null; // null | "checking" | "valid" | "invalid"
+  @tracked iconValidationMessage = "";
+  @tracked iconPreviewUrl = null;
   @tracked screenshots = [];
   @tracked fieldErrors = {};
   uppyUpload = new UppyUpload(getOwner(this), {
@@ -62,6 +65,8 @@ export default class ApkComposerFields extends Component {
   });
   _debounceTimer = null;
   _validateDebounceTimer = null;
+  _iconDebounceTimer = null;
+  _iconValidationToken = 0;
 
   constructor() {
     super(...arguments);
@@ -80,6 +85,10 @@ export default class ApkComposerFields extends Component {
         // ignore: avoid breaking composer when draft metaData is unexpected
       }
     }
+
+    if (this.iconUrl?.trim()) {
+      this._validateIcon();
+    }
   }
 
   willDestroy() {
@@ -92,6 +101,10 @@ export default class ApkComposerFields extends Component {
     if (this._validateDebounceTimer) {
       cancel(this._validateDebounceTimer);
     }
+    if (this._iconDebounceTimer) {
+      cancel(this._iconDebounceTimer);
+    }
+    this._iconValidationToken++;
   }
 
   _getModelMetaData() {
@@ -281,6 +294,17 @@ export default class ApkComposerFields extends Component {
       }
     }
 
+    // Icon URL is optional, but if provided it must resolve to a real image
+    if (this.iconUrl?.trim()) {
+      if (this.iconValidationStatus === "invalid") {
+        errors.iconUrl = i18n(
+          "sideloaded_apps.icon_validation.cannot_submit_invalid"
+        );
+      } else if (this.iconValidationStatus === "checking") {
+        errors.iconUrl = i18n("sideloaded_apps.icon_validation.still_checking");
+      }
+    }
+
     this.fieldErrors = errors;
 
     const hasErrors = Object.values(errors).some(Boolean);
@@ -365,6 +389,55 @@ export default class ApkComposerFields extends Component {
           "sideloaded_apps.link_validation.verification_failed"
         );
       });
+  }
+
+  _validateIcon() {
+    const url = this.iconUrl.trim();
+
+    if (!url) {
+      this.iconValidationStatus = null;
+      this.iconValidationMessage = "";
+      this.iconPreviewUrl = null;
+      this._iconValidationToken++;
+      return;
+    }
+
+    if (!url.match(/^https?:\/\/.+/)) {
+      this.iconValidationStatus = "invalid";
+      this.iconValidationMessage = i18n(
+        "sideloaded_apps.icon_validation.invalid_url"
+      );
+      this.iconPreviewUrl = null;
+      this._iconValidationToken++;
+      return;
+    }
+
+    const token = ++this._iconValidationToken;
+    this.iconValidationStatus = "checking";
+    this.iconValidationMessage = "";
+
+    const img = new Image();
+    img.onload = () => {
+      if (token !== this._iconValidationToken) {
+        return;
+      }
+      this.iconValidationStatus = "valid";
+      this.iconValidationMessage = i18n(
+        "sideloaded_apps.icon_validation.valid"
+      );
+      this.iconPreviewUrl = url;
+    };
+    img.onerror = () => {
+      if (token !== this._iconValidationToken) {
+        return;
+      }
+      this.iconValidationStatus = "invalid";
+      this.iconValidationMessage = i18n(
+        "sideloaded_apps.icon_validation.invalid"
+      );
+      this.iconPreviewUrl = null;
+    };
+    img.src = url;
   }
 
   get model() {
@@ -484,6 +557,10 @@ export default class ApkComposerFields extends Component {
 
     if (field === "apkLink") {
       this._debounceTimer = debounce(this, this._validateLink, 800);
+    }
+
+    if (field === "iconUrl") {
+      this._iconDebounceTimer = debounce(this, this._validateIcon, 600);
     }
 
     const validateOnChange = [
@@ -710,18 +787,54 @@ export default class ApkComposerFields extends Component {
         </label>
       </div>
 
-      <div class="sideloaded-form__field">
-        <input
-          id="sl-composer-icon-url"
-          type="url"
-          value={{this.iconUrl}}
-          aria-label={{i18n "sideloaded_apps.form.icon_url"}}
-          placeholder={{i18n "sideloaded_apps.form.icon_url"}}
-          {{on "input" (fn this.updateField "iconUrl")}}
-        />
-        <span class="sideloaded-form__help">{{i18n
-            "sideloaded_apps.form.icon_url_help"
-          }}</span>
+      <div
+        class="sideloaded-form__field sideloaded-form__field--icon-url
+          {{if this.fieldErrors.iconUrl '--has-error'}}"
+      >
+        <div class="sideloaded-icon-url-row">
+          <div class="sideloaded-icon-url-row__input">
+            <input
+              id="sl-composer-icon-url"
+              type="url"
+              value={{this.iconUrl}}
+              aria-label={{i18n "sideloaded_apps.form.icon_url"}}
+              placeholder={{i18n "sideloaded_apps.form.icon_url"}}
+              {{on "input" (fn this.updateField "iconUrl")}}
+            />
+            <span class="sideloaded-form__help">{{i18n
+                "sideloaded_apps.form.icon_url_help"
+              }}</span>
+            {{#if (eq this.iconValidationStatus "checking")}}
+              <span class="sideloaded-link-status --checking">
+                {{i18n "sideloaded_apps.icon_validation.checking"}}
+              </span>
+            {{else if (eq this.iconValidationStatus "valid")}}
+              <span class="sideloaded-link-status --valid">
+                ✓
+                {{this.iconValidationMessage}}
+              </span>
+            {{else if (eq this.iconValidationStatus "invalid")}}
+              <span class="sideloaded-link-status --invalid">
+                ✗
+                {{this.iconValidationMessage}}
+              </span>
+            {{/if}}
+            {{#if this.fieldErrors.iconUrl}}
+              <span
+                class="sideloaded-form__error"
+              >{{this.fieldErrors.iconUrl}}</span>
+            {{/if}}
+          </div>
+          {{#if this.iconPreviewUrl}}
+            <div class="sideloaded-icon-preview">
+              <img
+                src={{this.iconPreviewUrl}}
+                alt={{i18n "sideloaded_apps.icon_validation.preview_alt"}}
+                class="sideloaded-icon-preview__img"
+              />
+            </div>
+          {{/if}}
+        </div>
       </div>
 
       <div

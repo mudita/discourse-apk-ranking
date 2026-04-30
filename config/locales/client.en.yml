@@ -159,6 +159,15 @@ en:
         cannot_submit_invalid: "The APK link could not be verified. Please fix the link before submitting."
         still_checking: "Link verification is still in progress. Please wait a moment and try again."
 
+      icon_validation:
+        checking: "Loading preview..."
+        valid: "Image loaded"
+        invalid: "Could not load image. Make sure the URL points directly to a publicly accessible image (PNG, JPG, GIF, WebP, SVG)."
+        invalid_url: "Invalid URL — must start with http:// or https://"
+        cannot_submit_invalid: "The icon URL is not a valid image. Please fix or clear the field before submitting."
+        still_checking: "Image preview is still loading. Please wait a moment and try again."
+        preview_alt: "App icon preview"
+
       dev_badge: "DEV"
       report_outdated: "Report outdated version"
       report_outdated_sending: "Sending..."

@@ -52,11 +52,17 @@ body.sideloaded-composer-active {
     }
 
     // Single scrollable container — outer .composer-fields handles overflow.
+    // Override Discourse's `touch-action: none` (compose.scss, hover:none media)
+    // — that rule is meant for the standard composer where .composer-fields holds
+    // only title+category and scroll happens inside the textarea. We replaced the
+    // textarea with a tall form inside .composer-fields, so we need pan-y to scroll.
     .composer-fields {
       flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
     }
   }
 }
@@ -456,6 +462,37 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
 
   &.--invalid {
     color: var(--danger);
+  }
+}
+
+// ── Icon URL Preview ────────────────────────────────
+.sideloaded-icon-url-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+
+  &__input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.sideloaded-icon-preview {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border: 1px solid $sl-border;
+  border-radius: $sl-radius;
+  background: $sl-bg-light;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &__img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 }
 
