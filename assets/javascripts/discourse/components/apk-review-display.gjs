@@ -12,6 +12,7 @@ import UppyUpload from "discourse/lib/uppy/uppy-upload";
 import { eq } from "discourse/truth-helpers";
 import { i18n } from "discourse-i18n";
 import { validateIconUrl } from "../lib/validate-icon-url";
+import ApkMmdBadge from "./apk-mmd-badge";
 import ApkStarRating from "./apk-star-rating";
 import ApkVerificationStatus from "./apk-verification-status";
 import ReportOutdatedModal from "./modal/report-outdated";
@@ -49,6 +50,7 @@ export default class ApkReviewDisplay extends Component {
   @tracked _editRating = 0;
   @tracked _editChecksum = "";
   @tracked _editScreenshots = [];
+  @tracked _editMmdDedicated = false;
 
   @tracked _editFieldErrors = {};
   @tracked _editLinkValidationStatus = null;
@@ -291,6 +293,7 @@ export default class ApkReviewDisplay extends Component {
       original_filename: url.split("/").pop(),
     }));
     this._editIconUrl = this.review.icon_url || "";
+    this._editMmdDedicated = !!this.review.mmd_dedicated;
     this._editIconValidationStatus = null;
     this._editIconValidationMessage = "";
     this._editIconPreviewUrl = null;
@@ -548,6 +551,11 @@ export default class ApkReviewDisplay extends Component {
   }
 
   @action
+  toggleEditMmdDedicated(event) {
+    this._editMmdDedicated = event.target.checked;
+  }
+
+  @action
   async saveEdit() {
     if (this._saving) {
       return;
@@ -605,6 +613,7 @@ export default class ApkReviewDisplay extends Component {
           : this._editChecksum.trim(),
         screenshot_urls: this._editScreenshots.map((s) => s.url),
         icon_url: this._editIconUrl.trim(),
+        mmd_dedicated: this._editMmdDedicated,
       };
 
       const newLink = this._editLink.trim();
@@ -704,11 +713,11 @@ export default class ApkReviewDisplay extends Component {
           <h3
             class="sideloaded-review-display__app-name"
           >{{this.review.app_name}}</h3>
-          {{#if this.review.author_is_developer}}
-            <span
-              class="sideloaded-review-display__dev-badge"
-              title={{i18n "sideloaded_apps.form.author_is_developer"}}
-            >DEV</span>
+          {{#if this.review.mmd_dedicated}}
+            <ApkMmdBadge
+              @showLabel={{true}}
+              class="sideloaded-review-display__mmd-badge"
+            />
           {{/if}}
           <span
             class="sideloaded-review-display__category-badge"
@@ -863,6 +872,20 @@ export default class ApkReviewDisplay extends Component {
                   </div>
                 {{/if}}
               </div>
+            </div>
+
+            <div
+              class="sideloaded-form__field sideloaded-form__field--checkbox"
+            >
+              <label>
+                <input
+                  type="checkbox"
+                  checked={{this._editMmdDedicated}}
+                  {{on "change" this.toggleEditMmdDedicated}}
+                />
+                <ApkMmdBadge />
+                {{i18n "sideloaded_apps.form.mmd_dedicated"}}
+              </label>
             </div>
 
             <div class="sideloaded-form__field">

@@ -7,11 +7,13 @@ import { getOwner } from "@ember/owner";
 import { cancel, debounce, schedule } from "@ember/runloop";
 import { service } from "@ember/service";
 import PickFilesButton from "discourse/components/pick-files-button";
+import icon from "discourse/helpers/d-icon";
 import { ajax } from "discourse/lib/ajax";
 import UppyUpload from "discourse/lib/uppy/uppy-upload";
 import { eq } from "discourse/truth-helpers";
 import { i18n } from "discourse-i18n";
 import { validateIconUrl } from "../lib/validate-icon-url";
+import ApkMmdBadge from "./apk-mmd-badge";
 import ApkStarRating from "./apk-star-rating";
 
 let _pendingApkData = null;
@@ -31,6 +33,7 @@ export function triggerValidateAll() {
 
 export default class ApkComposerFields extends Component {
   @service currentUser;
+  @service siteSettings;
 
   @tracked appName = "";
   @tracked appCategory = "";
@@ -41,6 +44,7 @@ export default class ApkComposerFields extends Component {
   @tracked appDescription = "";
   @tracked knownIssues = "";
   @tracked authorIsDeveloper = false;
+  @tracked mmdDedicated = false;
   @tracked iconUrl = "";
 
   @tracked linkValidationStatus = null; // null | "checking" | "valid" | "info" | "invalid"
@@ -137,6 +141,7 @@ export default class ApkComposerFields extends Component {
     this.appDescription = data.app_description || "";
     this.knownIssues = data.known_issues || "";
     this.authorIsDeveloper = !!data.author_is_developer;
+    this.mmdDedicated = !!data.mmd_dedicated;
     this.iconUrl = data.icon_url || "";
     this.linkIsDirectDownload = data.is_direct_download ?? null;
     this.screenshots = data.screenshots || [];
@@ -161,6 +166,7 @@ export default class ApkComposerFields extends Component {
     this.knownIssues = this._get(metaData, "apk_known_issues") || "";
     this.authorIsDeveloper =
       this._get(metaData, "apk_author_is_developer") === "true";
+    this.mmdDedicated = this._get(metaData, "apk_mmd_dedicated") === "true";
     this.iconUrl = this._get(metaData, "apk_icon_url") || "";
     const urlsRaw = this._get(metaData, "apk_screenshot_urls");
     if (typeof urlsRaw === "string" && urlsRaw) {
@@ -185,6 +191,19 @@ export default class ApkComposerFields extends Component {
       .toLowerCase();
   }
 
+  get _reviewAuthorName() {
+    return this.currentUser?.username || this.currentUser?.name || "Author";
+  }
+
+  // Length of the auto-generated topic title, measured the same way core
+  // does (collapse whitespace + trim), so our app-name validation matches
+  // Discourse's hidden min_topic_title_length check.
+  _generatedTitleLength(name) {
+    return `${name} review by ${this._reviewAuthorName}`
+      .replace(/\s+/g, " ")
+      .trim().length;
+  }
+
   _computeFieldError(field) {
     const name = this.appName?.trim() ?? "";
     const link = this.apkLink?.trim() ?? "";
@@ -196,7 +215,7 @@ export default class ApkComposerFields extends Component {
       /^v?\d+(?:\.\d+){0,4}(?:[-+][0-9A-Za-z][0-9A-Za-z.+-]*)?(?:\s*\(\d+\))?$/;
 
     switch (field) {
-      case "appName":
+      case "appName": {
         if (!name) {
           return i18n("sideloaded_apps.form.validation.required");
         }
@@ -206,7 +225,17 @@ export default class ApkComposerFields extends Component {
         if (name.length > 100) {
           return i18n("sideloaded_apps.form.validation.app_name_max");
         }
+        // The topic title is auto-generated from the app name; make sure it
+        // satisfies Discourse's min_topic_title_length, otherwise core would
+        // silently block the save on the hidden title input.
+        const minTitle = this.siteSettings?.min_topic_title_length ?? 15;
+        if (this._generatedTitleLength(name) < minTitle) {
+          return i18n("sideloaded_apps.form.validation.title_too_short", {
+            count: minTitle,
+          });
+        }
         return null;
+      }
       case "appCategory":
         if (!this.appCategory) {
           return i18n("sideloaded_apps.form.validation.category_required");
@@ -476,8 +505,7 @@ export default class ApkComposerFields extends Component {
       return;
     }
 
-    const authorName =
-      this.currentUser?.username || this.currentUser?.name || "Author";
+    const authorName = this._reviewAuthorName;
     if (name) {
       this.model.set("title", `${name} review by ${authorName}`);
     }
@@ -515,6 +543,7 @@ export default class ApkComposerFields extends Component {
       link_validation_status: this.linkValidationStatus,
       screenshots: this.screenshots,
       author_is_developer: this.authorIsDeveloper,
+      mmd_dedicated: this.mmdDedicated,
       icon_url: this.iconUrl.trim(),
     };
 
@@ -531,6 +560,7 @@ export default class ApkComposerFields extends Component {
       apk_checksum: checksumForSave,
       apk_screenshot_urls: JSON.stringify(screenshotUrls),
       apk_author_is_developer: this.authorIsDeveloper ? "true" : "false",
+      apk_mmd_dedicated: this.mmdDedicated ? "true" : "false",
       apk_icon_url: this.iconUrl.trim() || "",
     });
   }
@@ -594,6 +624,12 @@ export default class ApkComposerFields extends Component {
     this._syncToModel();
   }
 
+  @action
+  toggleMmdDedicated(event) {
+    this.mmdDedicated = event.target.checked;
+    this._syncToModel();
+  }
+
   <template>
     <div class="sideloaded-composer-fields">
       <div
@@ -620,24 +656,27 @@ export default class ApkComposerFields extends Component {
         class="sideloaded-form__field
           {{if this.fieldErrors.appCategory '--has-error'}}"
       >
-        <select
-          id="sl-composer-app-category"
-          aria-label={{i18n "sideloaded_apps.form.app_category"}}
-          {{on "change" (fn this.updateField "appCategory")}}
-          {{on "blur" (fn this.validateField "appCategory")}}
-        >
-          <option value="">{{i18n
-              "sideloaded_apps.form.app_category"
-            }}</option>
-          {{#each this.appCategories as |cat|}}
-            <option
-              value={{cat.value}}
-              selected={{eq cat.value this.appCategory}}
-            >
-              {{cat.label}}
-            </option>
-          {{/each}}
-        </select>
+        <div class="sideloaded-select-wrapper">
+          <select
+            id="sl-composer-app-category"
+            aria-label={{i18n "sideloaded_apps.form.app_category"}}
+            {{on "change" (fn this.updateField "appCategory")}}
+            {{on "blur" (fn this.validateField "appCategory")}}
+          >
+            <option value="">{{i18n
+                "sideloaded_apps.form.app_category"
+              }}</option>
+            {{#each this.appCategories as |cat|}}
+              <option
+                value={{cat.value}}
+                selected={{eq cat.value this.appCategory}}
+              >
+                {{cat.label}}
+              </option>
+            {{/each}}
+          </select>
+          {{icon "angle-down" class="sideloaded-select-caret"}}
+        </div>
         {{#if this.fieldErrors.appCategory}}
           <span
             class="sideloaded-form__error"
@@ -769,6 +808,18 @@ export default class ApkComposerFields extends Component {
             {{on "change" this.toggleAuthorIsDeveloper}}
           />
           {{i18n "sideloaded_apps.form.author_is_developer"}}
+        </label>
+      </div>
+
+      <div class="sideloaded-form__field sideloaded-form__field--checkbox">
+        <label>
+          <input
+            type="checkbox"
+            checked={{this.mmdDedicated}}
+            {{on "change" this.toggleMmdDedicated}}
+          />
+          <ApkMmdBadge />
+          {{i18n "sideloaded_apps.form.mmd_dedicated"}}
         </label>
       </div>
 

@@ -333,12 +333,25 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   }
 
   select {
-    appearance: auto;
+    // appearance: none removes the browser's native arrow; the single caret
+    // below is the Discourse `angle-down` d-icon, matching the standard
+    // new-topic category chooser (select-kit).
+    appearance: none;
     padding-right: 40px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='%23517b98' d='M5.5 7.5l4.5 5 4.5-5z'/></svg>");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
-    background-size: 16px;
+  }
+
+  .sideloaded-select-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .sideloaded-select-caret {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    color: var(--primary-medium);
+    pointer-events: none;
   }
 
   &--checkbox label {
@@ -601,18 +614,6 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
     color: $sl-primary;
     font-size: 0.8em;
     font-weight: 500;
-  }
-
-  &__dev-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgb(46, 125, 50, 0.15);
-    color: #2e7d32;
-    font-size: 0.7em;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
   }
 
   &__header-actions {
@@ -924,6 +925,54 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   vertical-align: middle;
+}
+
+// DEV badge rendered after the topic title (next to the review author).
+.sideloaded-title-dev-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(46, 125, 50, 0.15);
+  color: #2e7d32;
+  font-size: 0.6em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+// "Dedicated for Mudita Kompakt" (MMD) badge — placeholder SVG icon lives in
+// the apk-mmd-badge component; restyle here.
+.sideloaded-mmd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba($sl-primary, 0.12);
+  color: $sl-primary;
+  font-size: 0.7em;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+
+  &__icon {
+    flex-shrink: 0;
+    width: 1.1em;
+    height: 1.1em;
+  }
+
+  &__text {
+    line-height: 1;
+  }
+}
+
+.sideloaded-topic-list-mmd-badge {
+  margin-right: 6px;
 }
 
 .sideloaded-app-category-badge {

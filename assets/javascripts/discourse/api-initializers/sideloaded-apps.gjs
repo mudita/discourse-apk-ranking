@@ -12,6 +12,7 @@ import ApkComposerFields, {
   getPendingApkData,
   triggerValidateAll,
 } from "../components/apk-composer-fields";
+import ApkMmdBadge from "../components/apk-mmd-badge";
 import ApkReviewDisplay from "../components/apk-review-display";
 import ApkStarRating from "../components/apk-star-rating";
 
@@ -288,6 +289,12 @@ export default apiInitializer((api) => {
         return this.args.outletArgs?.model?.topic?.apk_user_rating;
       }
 
+      // Only review topics carry an apk_review; info posts (tutorials/FAQ)
+      // must not show the reply rating field.
+      get isReviewTopic() {
+        return !!this.args.outletArgs?.model?.topic?.apk_review;
+      }
+
       @action
       toggleInfoPostMode(event) {
         const checked = event?.target?.checked ?? !this.isInfoPostMode;
@@ -318,13 +325,39 @@ export default apiInitializer((api) => {
           {{/if}}
         {{else if this.isTopicAuthor}}
           {{! Author already rated when creating the review }}
-        {{else}}
+        {{else if this.isReviewTopic}}
           <ReplyRatingField
             @model={{@outletArgs.model}}
             @existingRating={{this.existingUserRating}}
           />
         {{/if}}
       </template>
+    }
+  );
+
+  // ── 4b. COMPOSER: keep Submit reaching our validation ──
+  // Core's composer service aborts save() early (and silently) when
+  // cantSubmitPost is true — e.g. the auto-generated title is empty (no app
+  // name yet) or shorter than min_topic_title_length, or the reply is too
+  // short. It then surfaces validation on the native title/reply inputs,
+  // which are hidden in our review form, so the user just sees a dead Submit
+  // button with no feedback. For the review form we override this so Submit
+  // always reaches composerBeforeSave → validateAll(), which renders inline
+  // per-field errors and red highlighting. validateAll() stays the real
+  // gatekeeper (it rejects the save when required fields are missing), so no
+  // empty/short-title topic can slip through.
+  api.registerValueTransformer(
+    "composer-service-cannot-submit-post",
+    ({ value, context }) => {
+      const model = context?.model;
+      if (
+        model?.action === "createTopic" &&
+        model?.category?.slug === categorySlug &&
+        !getComposerInfoPostMode()
+      ) {
+        return false;
+      }
+      return value;
     }
   );
 
@@ -402,7 +435,9 @@ export default apiInitializer((api) => {
       const isAuthor =
         currentUser && topicUserId && currentUser.id === topicUserId;
 
-      if (!isAuthor) {
+      // A rating is only required when replying to an actual review. Replies
+      // to info posts (no apk_review) must not be forced to rate.
+      if (!isAuthor && model?.topic?.apk_review) {
         const rating = model.metaData?.apk_rating;
         if (!rating || rating < 1 || rating > 5) {
           const topicId = model?.topic?.id;
@@ -480,6 +515,27 @@ export default apiInitializer((api) => {
             @onRated={{this.handleRated}}
           />
         </div>
+      </template>
+    }
+  );
+
+  // ── 6b. TOPIC TITLE: DEV badge next to the review author ──
+  // author_is_developer concerns the review author, so the badge belongs by
+  // the username in the topic title ("App review by user DEV") rather than
+  // inside the review card. topic-title-suffix renders right after the
+  // fancy-title, which ends with the author's username.
+  api.renderInOutlet(
+    "topic-title-suffix",
+    class SideloadedTitleDevBadge extends Component {
+      static shouldRender(args) {
+        return !!args.model?.apk_review?.author_is_developer;
+      }
+
+      <template>
+        <span
+          class="sideloaded-title-dev-badge"
+          title={{i18n "sideloaded_apps.dev_badge_title"}}
+        >{{i18n "sideloaded_apps.dev_badge"}}</span>
       </template>
     }
   );
@@ -569,12 +625,19 @@ export default apiInitializer((api) => {
         return !!this.topic?.apk_author_is_developer;
       }
 
+      get isMmd() {
+        return !!this.topic?.apk_mmd_dedicated;
+      }
+
       <template>
         {{! Order: category app -> logo -> dev badge (topic name from core, then rating in after-title) }}
         {{#if this.appCategory}}
           <span class="sideloaded-app-category-badge">
             {{this.appCategory}}
           </span>
+        {{/if}}
+        {{#if this.isMmd}}
+          <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
         {{/if}}
         {{#if this.isDeveloper}}
           <span class="sideloaded-dev-badge">{{i18n
@@ -651,6 +714,9 @@ export default apiInitializer((api) => {
                   <span class="sideloaded-dev-badge">{{i18n
                       "sideloaded_apps.dev_badge"
                     }}</span>
+                {{/if}}
+                {{#if this.data.mmd_dedicated}}
+                  <ApkMmdBadge @showLabel={{true}} />
                 {{/if}}
               </span>
             </div>

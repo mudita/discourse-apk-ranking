@@ -36,6 +36,43 @@ module ::DiscourseApkRanking
     s = raw.to_s
     s.include?(PREFIX_START) || s.include?(AUDIT_START)
   end
+
+  # Resolve a list of upload URLs (long /uploads/... or short upload://...)
+  # to Upload IDs. Used by both the create/edit flow and the queue-protection
+  # hook below; missing uploads are silently skipped.
+  def self.find_upload_ids_for_urls(urls)
+    Array(urls).filter_map do |url|
+      sha1 = Upload.sha1_from_short_url(url) || Upload.sha1_from_long_url(url)
+      upload = sha1 && Upload.find_by(sha1: sha1)
+      upload ||= Upload.find_by("url LIKE ?", "%#{url.split("/").last(3).join("/")}")
+      upload&.id
+    end
+  end
+
+  # Idempotently link the given upload URLs to `target` so Jobs::CleanUpUploads
+  # (which deletes orphans after `clean_orphan_uploads_grace_period_hours`,
+  # default 48h) keeps the files alive for as long as `target` exists.
+  # `target` can be any model — Post for approved reviews, Reviewable for
+  # queued ones (so screenshots survive moderation taking longer than 48h).
+  def self.protect_screenshot_uploads_for(urls:, target:)
+    return if target.nil? || urls.blank?
+
+    upload_ids = find_upload_ids_for_urls(urls)
+    return if upload_ids.empty?
+
+    existing_ids = UploadReference.where(target: target).pluck(:upload_id)
+    new_ids = upload_ids - existing_ids
+
+    new_ids.each do |uid|
+      UploadReference.create!(upload_id: uid, target: target)
+    rescue ActiveRecord::RecordNotUnique
+      # already exists — safe to ignore
+    end
+  rescue => e
+    Rails.logger.warn(
+      "[Sideloaded Apps] Failed to protect uploads for #{target.class}##{target.id}: #{e.message}",
+    )
+  end
 end
 
 register_editable_topic_custom_field(:apk_app_name)
@@ -50,11 +87,13 @@ register_editable_topic_custom_field(:apk_rating)
 register_editable_topic_custom_field(:apk_screenshot_urls)
 register_editable_topic_custom_field(:apk_author_is_developer)
 register_editable_topic_custom_field(:apk_icon_url)
+register_editable_topic_custom_field(:apk_mmd_dedicated)
 
 after_initialize do
   require Rails.root.join("app/models/topic_list.rb").to_s
   TopicList.preloaded_custom_fields << "apk_author_is_developer"
   TopicList.preloaded_custom_fields << "apk_icon_url"
+  TopicList.preloaded_custom_fields << "apk_mmd_dedicated"
 
   # Ensure topic_opts (containing custom_fields) survives the approval queue
   NewPostManager.add_plugin_payload_attribute(:topic_opts)
@@ -86,35 +125,12 @@ after_initialize do
   end
 
   # ── Helper: protect screenshot uploads from cleanup ──
-  # Discourse deletes uploads without UploadReference records.
-  # Screenshots stored only in ApkReview.screenshot_urls would be
-  # considered orphaned, so we create UploadReference entries linking
-  # each upload to the topic's first post.
+  # Links uploads to the topic's first post so Jobs::CleanUpUploads keeps
+  # them alive. For queued posts (no Post yet) see :reviewable_created hook
+  # below — it links to the Reviewable instead.
   def self.ensure_screenshot_upload_references(topic_id, screenshot_urls)
-    return if screenshot_urls.blank?
-
     post = Post.find_by(topic_id: topic_id, post_number: 1)
-    return unless post
-
-    upload_ids = screenshot_urls.filter_map do |url|
-      sha1 = Upload.sha1_from_short_url(url) || Upload.sha1_from_long_url(url)
-      upload = sha1 && Upload.find_by(sha1: sha1)
-      upload ||= Upload.find_by("url LIKE ?", "%#{url.split("/").last(3).join("/")}")
-      upload&.id
-    end
-
-    return if upload_ids.empty?
-
-    existing_ids = UploadReference.where(target: post).pluck(:upload_id)
-    new_ids = upload_ids - existing_ids
-
-    new_ids.each do |uid|
-      UploadReference.create!(upload_id: uid, target: post)
-    rescue ActiveRecord::RecordNotUnique
-      # already exists — safe to ignore
-    end
-  rescue => e
-    Rails.logger.warn("[Sideloaded Apps] Failed to create upload references for topic #{topic_id}: #{e.message}")
+    ::DiscourseApkRanking.protect_screenshot_uploads_for(urls: screenshot_urls, target: post)
   end
 
   add_to_serializer(:reviewable_queued_post, :apk_review_data) do
@@ -132,6 +148,7 @@ after_initialize do
       known_issues: cf["apk_known_issues"] || "",
       apk_checksum: cf["apk_checksum"] || "",
       author_is_developer: cf["apk_author_is_developer"] == "true",
+      mmd_dedicated: cf["apk_mmd_dedicated"] == "true",
       icon_url: cf["apk_icon_url"] || "",
       screenshot_urls: begin
         JSON.parse(cf["apk_screenshot_urls"] || "[]")
@@ -275,13 +292,19 @@ after_initialize do
         end,
       )
 
-      all_ratings = (ratings_by_topic[topic.id] || []).select { |r| r.between?(1, 5) }
-
-      if all_ratings.any?
-        avg = (all_ratings.sum.to_f / all_ratings.size).round(1)
-        topic.preload_apk_community_rating({ average: avg, count: all_ratings.size })
+      # Community ratings only apply to actual reviews. Info posts (no
+      # ApkReview) must never carry a rating — preload nil so the list renders
+      # the "—" placeholder instead of a star value.
+      if review
+        all_ratings = (ratings_by_topic[topic.id] || []).select { |r| r.between?(1, 5) }
+        if all_ratings.any?
+          avg = (all_ratings.sum.to_f / all_ratings.size).round(1)
+          topic.preload_apk_community_rating({ average: avg, count: all_ratings.size })
+        else
+          topic.preload_apk_community_rating({ average: 0.0, count: 0 })
+        end
       else
-        topic.preload_apk_community_rating({ average: 0.0, count: 0 })
+        topic.preload_apk_community_rating(nil)
       end
     end
 
@@ -355,6 +378,11 @@ after_initialize do
     object.custom_fields["apk_author_is_developer"] == "true"
   end
 
+  add_to_serializer(:topic_list_item, :apk_mmd_dedicated) do
+    return false unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    object.custom_fields["apk_mmd_dedicated"] == "true"
+  end
+
   add_to_serializer(:topic_list_item, :apk_icon_url) do
     return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
     url = object.custom_fields["apk_icon_url"].to_s.strip
@@ -364,6 +392,11 @@ after_initialize do
   add_to_serializer(:topic_view, :apk_author_is_developer) do
     return false unless object.topic.category&.slug == SiteSetting.sideloaded_apps_category_slug
     object.topic.custom_fields["apk_author_is_developer"] == "true"
+  end
+
+  add_to_serializer(:topic_view, :apk_mmd_dedicated) do
+    return false unless object.topic.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    object.topic.custom_fields["apk_mmd_dedicated"] == "true"
   end
 
   add_to_serializer(:topic_view, :apk_icon_url) do
@@ -420,8 +453,14 @@ after_initialize do
            ) community_ratings ON community_ratings.topic_id = topics.id",
         )
         .order(
+          # Tie-break equal averages by number of ratings (more ratings rank
+          # higher), so a 5.0 with many ratings beats a 5.0 with one. The
+          # count tie-break is always DESC regardless of the average's
+          # direction — more ratings = more confidence.
           Arel.sql(
-            "#{pinned_first}, COALESCE(community_ratings.community_avg, 0) #{direction}",
+            "#{pinned_first}, " \
+              "COALESCE(community_ratings.community_avg, 0) #{direction}, " \
+              "COALESCE(community_ratings.community_count, 0) DESC",
           ),
         )
     else
@@ -495,6 +534,38 @@ after_initialize do
     end
   rescue => e
     Rails.logger.error("[Sideloaded Apps] Failed to create review for topic #{topic.id}: #{e.message}")
+  end
+
+  # ── Protect screenshot uploads while a queued review awaits moderation ──
+  # Without this, Jobs::CleanUpUploads deletes the screenshots after
+  # `clean_orphan_uploads_grace_period_hours` (default 48h) because the
+  # post doesn't exist yet — so anything sitting in the queue longer than
+  # that loses its images. Linking to the Reviewable bridges the gap; once
+  # approved, :approved_post links them to the Post too.
+  on(:reviewable_created) do |reviewable|
+    next unless SiteSetting.sideloaded_apps_ranking_enabled
+    next unless reviewable.is_a?(ReviewableQueuedPost)
+
+    payload = reviewable.payload || {}
+    topic_opts = payload["topic_opts"] || {}
+    cf = topic_opts["custom_fields"] || {}
+
+    next if cf["apk_app_name"].blank?
+
+    raw = cf["apk_screenshot_urls"]
+    next if raw.blank?
+
+    screenshot_urls =
+      begin
+        JSON.parse(raw)
+      rescue JSON::ParserError
+        []
+      end
+
+    ::DiscourseApkRanking.protect_screenshot_uploads_for(
+      urls: screenshot_urls,
+      target: reviewable,
+    )
   end
 
   # ── Handle topics approved from the review queue ────
@@ -654,6 +725,10 @@ after_initialize do
     next unless SiteSetting.sideloaded_apps_ranking_enabled
     next if post.post_number == 1
     next unless post.topic&.category&.slug == SiteSetting.sideloaded_apps_category_slug
+
+    # Only review topics are ratable. Info posts (tutorials/FAQ, no ApkReview)
+    # get no rating persistence and no auto-prefix.
+    next unless ApkReview.exists?(topic_id: post.topic_id)
 
     is_topic_author = post.topic.user_id == user.id
 

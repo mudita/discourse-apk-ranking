@@ -18,6 +18,7 @@ class ::ApkReviewSerializer < ::ApplicationSerializer
              :community_average,
              :community_count,
              :author_is_developer,
+             :mmd_dedicated,
              :icon_url,
              :created_at,
              :updated_at
@@ -41,6 +42,10 @@ class ::ApkReviewSerializer < ::ApplicationSerializer
 
   def author_is_developer
     object.topic&.custom_fields&.dig("apk_author_is_developer") == "true"
+  end
+
+  def mmd_dedicated
+    object.topic&.custom_fields&.dig("apk_mmd_dedicated") == "true"
   end
 
   private

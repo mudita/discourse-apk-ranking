@@ -81,9 +81,11 @@ class ::ApkReviewsController < ::ApplicationController
     )
 
     icon_url_param = params.dig(:review, :icon_url)
+    mmd_dedicated_param = params.dig(:review, :mmd_dedicated)
 
     if review.update(review_params)
       update_topic_icon_url(review.topic, icon_url_param)
+      update_topic_mmd_dedicated(review.topic, mmd_dedicated_param)
       create_edit_audit_post(review, old_attrs)
       protect_screenshot_uploads(review)
 
@@ -229,6 +231,10 @@ class ::ApkReviewsController < ::ApplicationController
     topic = Topic.find_by(id: params[:topic_id])
     return render json: { error: "Topic not found" }, status: 404 unless topic
     return render json: { error: "Not in sideloaded apps category" }, status: 422 unless topic.category&.slug == SiteSetting.sideloaded_apps_category_slug
+
+    unless ApkReview.exists?(topic_id: topic.id)
+      return render json: { error: "You can only rate app reviews" }, status: 422
+    end
 
     if topic.user_id == current_user.id
       return render json: { error: "You cannot rate your own review" }, status: 422
@@ -483,28 +489,11 @@ class ::ApkReviewsController < ::ApplicationController
   end
 
   def protect_screenshot_uploads(review)
-    urls = review.screenshot_urls
-    return if urls.blank?
-
     post = Post.find_by(topic_id: review.topic_id, post_number: 1)
-    return unless post
-
-    upload_ids = urls.filter_map do |url|
-      sha1 = Upload.sha1_from_short_url(url) || Upload.sha1_from_long_url(url)
-      upload = sha1 && Upload.find_by(sha1: sha1)
-      upload ||= Upload.find_by("url LIKE ?", "%#{url.split("/").last(3).join("/")}")
-      upload&.id
-    end
-
-    return if upload_ids.empty?
-
-    upload_ids.each do |uid|
-      UploadReference.find_or_create_by!(upload_id: uid, target: post)
-    rescue ActiveRecord::RecordNotUnique
-      # already exists
-    end
-  rescue => e
-    Rails.logger.warn("[Sideloaded Apps] Failed to protect screenshot uploads for topic #{review.topic_id}: #{e.message}")
+    ::DiscourseApkRanking.protect_screenshot_uploads_for(
+      urls: review.screenshot_urls,
+      target: post,
+    )
   end
 
   FIELD_LABELS = {
@@ -577,6 +566,19 @@ class ::ApkReviewsController < ::ApplicationController
     return if topic.custom_fields["apk_icon_url"].to_s == cleaned
 
     topic.custom_fields["apk_icon_url"] = cleaned
+    topic.save_custom_fields
+  end
+
+  # mmd_dedicated is a boolean topic custom field (not an ApkReview column),
+  # handled separately from review_params. nil param = client didn't send the
+  # field (don't touch); otherwise cast to a canonical "true"/"false" string.
+  def update_topic_mmd_dedicated(topic, raw)
+    return if raw.nil? || topic.nil?
+
+    value = ActiveModel::Type::Boolean.new.cast(raw) ? "true" : "false"
+    return if topic.custom_fields["apk_mmd_dedicated"].to_s == value
+
+    topic.custom_fields["apk_mmd_dedicated"] = value
     topic.save_custom_fields
   end
 end
