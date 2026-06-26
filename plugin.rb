@@ -429,38 +429,60 @@ after_initialize do
       # Clicking the "Topic" column header → sort alphabetically by title
       result.order(Arel.sql("#{pinned_first}, LOWER(topics.title) #{direction}"))
     elsif sort_column == "community_rating"
-      # Explicit click on the Community Rating column
+      # Explicit click on the Community Rating column.
+      #
+      # The aggregate MUST be computed the same way as the value rendered in
+      # the column (see TopicList.on_preload / ApkReview.community_rating_for):
+      # one rating per (topic, user), with the PluginStore rating taking
+      # precedence over the reply PostCustomField rating. Reply ratings are
+      # written to BOTH stores, so a naive UNION ALL double-counts them and the
+      # sort diverges from the displayed numbers (looks "unsorted"). DISTINCT ON
+      # dedups per (topic, user), preferring the PluginStore row (priority 0).
+      #
+      # pinned_first keeps pinned topics on top regardless of rating — core
+      # disables its own pin-priority for non-default/activity orders, so this
+      # ORDER BY is what keeps pins pinned here.
       result
         .joins(
           "LEFT JOIN (
-             SELECT combined.topic_id,
-                    AVG(combined.rating) AS community_avg,
+             SELECT topic_id,
+                    AVG(rating) AS community_avg,
                     COUNT(*) AS community_count
              FROM (
-               SELECT posts.topic_id, post_custom_fields.value::integer AS rating
-               FROM post_custom_fields
-               INNER JOIN posts ON posts.id = post_custom_fields.post_id
-               WHERE post_custom_fields.name = 'apk_rating'
-                 AND posts.deleted_at IS NULL
-                 AND posts.post_number > 1
-               UNION ALL
-               SELECT SUBSTRING(key FROM 't(\\d+)_u')::integer AS topic_id,
-                      value::integer AS rating
-               FROM plugin_store_rows
-               WHERE plugin_name = 'sideloaded_ratings'
-             ) combined
-             GROUP BY combined.topic_id
+               SELECT DISTINCT ON (topic_id, user_id) topic_id, user_id, rating
+               FROM (
+                 SELECT SUBSTRING(key FROM 't(\\d+)_u')::integer AS topic_id,
+                        SUBSTRING(key FROM 't\\d+_u(\\d+)')::integer AS user_id,
+                        value::integer AS rating,
+                        0 AS source_priority
+                 FROM plugin_store_rows
+                 WHERE plugin_name = 'sideloaded_ratings'
+                 UNION ALL
+                 SELECT posts.topic_id, posts.user_id,
+                        post_custom_fields.value::integer AS rating,
+                        1 AS source_priority
+                 FROM post_custom_fields
+                 INNER JOIN posts ON posts.id = post_custom_fields.post_id
+                 WHERE post_custom_fields.name = 'apk_rating'
+                   AND posts.deleted_at IS NULL
+                   AND posts.post_number > 1
+               ) sources
+               ORDER BY topic_id, user_id, source_priority
+             ) deduped
+             WHERE rating BETWEEN 1 AND 5
+             GROUP BY topic_id
            ) community_ratings ON community_ratings.topic_id = topics.id",
         )
         .order(
-          # Tie-break equal averages by number of ratings (more ratings rank
-          # higher), so a 5.0 with many ratings beats a 5.0 with one. The
-          # count tie-break is always DESC regardless of the average's
-          # direction — more ratings = more confidence.
+          # Pinned topics first (always on top), then by average; equal
+          # averages rank by number of ratings (more ratings = higher
+          # confidence), so a 5.0 with many ratings beats a 5.0 with one.
+          # bumped_at is a final deterministic tie-break for identical ratings.
           Arel.sql(
             "#{pinned_first}, " \
               "COALESCE(community_ratings.community_avg, 0) #{direction}, " \
-              "COALESCE(community_ratings.community_count, 0) DESC",
+              "COALESCE(community_ratings.community_count, 0) DESC, " \
+              "topics.bumped_at DESC",
           ),
         )
     else
