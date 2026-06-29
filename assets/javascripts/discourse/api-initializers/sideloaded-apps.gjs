@@ -519,21 +519,24 @@ export default apiInitializer((api) => {
     }
   );
 
-  // ── 6b. TOPIC TITLE: DEV badge next to the review author ──
-  // author_is_developer concerns the review author, so the badge belongs by
-  // the username in the topic title ("App review by user DEV") rather than
-  // inside the review card. topic-title-suffix renders right after the
-  // fancy-title, which ends with the author's username.
+  // ── 6b. POST AUTHOR: DEV badge next to the review author's username ──
+  // author_is_developer is about the review author, so the badge sits next to
+  // their username on the first post (the review). The "__after" pseudo-outlet
+  // renders after the poster name without wrapping it — a plain connector on
+  // the block-form `post-meta-data-poster-name` outlet would wrap the name.
   api.renderInOutlet(
-    "topic-title-suffix",
-    class SideloadedTitleDevBadge extends Component {
+    "post-meta-data-poster-name__after",
+    class SideloadedPosterDevBadge extends Component {
       static shouldRender(args) {
-        return !!args.model?.apk_review?.author_is_developer;
+        return (
+          args.post?.post_number === 1 &&
+          !!args.post?.topic?.apk_review?.author_is_developer
+        );
       }
 
       <template>
         <span
-          class="sideloaded-title-dev-badge"
+          class="sideloaded-poster-dev-badge"
           title={{i18n "sideloaded_apps.dev_badge_title"}}
         >{{i18n "sideloaded_apps.dev_badge"}}</span>
       </template>

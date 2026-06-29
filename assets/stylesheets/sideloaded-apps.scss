@@ -22,6 +22,14 @@ body.sideloaded-composer-active {
     .d-editor-preview-wrapper {
       display: none !important;
     }
+
+    // Hide the fullscreen toggle for the review form. Core wraps the
+    // composer-fields outlet (where our form lives) in {{#unless viewFullscreen}},
+    // so going fullscreen unmounts the whole form and leaves only the raw
+    // textarea — fullscreen makes no sense for this structured form.
+    .toggle-fullscreen {
+      display: none !important;
+    }
   }
 
   // A soft default minimum so the form has room on first open.
@@ -927,16 +935,17 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   vertical-align: middle;
 }
 
-// DEV badge rendered after the topic title (next to the review author).
-.sideloaded-title-dev-badge {
+// DEV badge rendered next to the review author's username (first post).
+.sideloaded-poster-dev-badge {
   display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
+  margin-left: 6px;
+  padding: 1px 6px;
   border-radius: 4px;
   background: rgb(46, 125, 50, 0.15);
   color: #2e7d32;
-  font-size: 0.6em;
+  font-size: 0.75em;
   font-weight: 600;
+  line-height: 1.4;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   vertical-align: middle;
