@@ -423,7 +423,20 @@ after_initialize do
     next result unless category_slug == SiteSetting.sideloaded_apps_category_slug
 
     direction = sort_dir == "ASC" ? "ASC" : "DESC"
-    pinned_first = "CASE WHEN topics.pinned_at IS NOT NULL THEN 0 ELSE 1 END ASC"
+    # Mirrors core's prioritize_pinned_topics: a pin the user dismissed
+    # (cleared_pinned_at) no longer counts. The tu join exists only for logged-in users.
+    pinned_condition = "topics.pinned_at IS NOT NULL"
+    if topic_query.user
+      pinned_condition +=
+        " AND (tu.cleared_pinned_at IS NULL OR topics.pinned_at > tu.cleared_pinned_at)"
+    end
+    pinned_first = "CASE WHEN #{pinned_condition} THEN 0 ELSE 1 END ASC"
+    column_sort =
+      if sort_column == "op_likes"
+        "(SELECT like_count FROM posts p3 WHERE p3.topic_id = topics.id AND p3.post_number = 1)"
+      elsif (column = TopicQuery::SORTABLE_MAPPING.except("activity", "category")[sort_column])
+        "topics.#{column}"
+      end
 
     if sort_column == "default"
       # Clicking the "Topic" column header → sort alphabetically by title
@@ -446,7 +459,7 @@ after_initialize do
         .joins(
           "LEFT JOIN (
              SELECT topic_id,
-                    AVG(rating) AS community_avg,
+                    ROUND(AVG(rating), 1) AS community_avg,
                     COUNT(*) AS community_count
              FROM (
                SELECT DISTINCT ON (topic_id, user_id) topic_id, user_id, rating
@@ -477,6 +490,8 @@ after_initialize do
           # Pinned topics first (always on top), then by average; equal
           # averages rank by number of ratings (more ratings = higher
           # confidence), so a 5.0 with many ratings beats a 5.0 with one.
+          # The average is rounded to one decimal like the displayed value,
+          # otherwise a 4.98 shown as "5.0" sorts below a real 5.0 with one vote.
           # bumped_at is a final deterministic tie-break for identical ratings.
           Arel.sql(
             "#{pinned_first}, " \
@@ -485,6 +500,10 @@ after_initialize do
               "topics.bumped_at DESC",
           ),
         )
+    elsif column_sort
+      # Core keeps pins on top only for the activity order, so every other
+      # sortable column has to put them first here.
+      result.order(Arel.sql("#{pinned_first}, #{column_sort} #{direction}"))
     else
       result
     end
