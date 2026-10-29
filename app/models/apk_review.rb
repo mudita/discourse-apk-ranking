@@ -5,13 +5,20 @@ class ::ApkReview < ActiveRecord::Base
 
   belongs_to :topic, class_name: "::Topic"
   belongs_to :user, class_name: "::User"
-  has_one :verification, class_name: "::ApkVerification", foreign_key: :topic_id, primary_key: :topic_id
+  has_one :verification,
+          class_name: "::ApkVerification",
+          foreign_key: :topic_id,
+          primary_key: :topic_id
 
   validates :topic_id, presence: true, uniqueness: true
   validates :user_id, presence: true
   validates :app_name, presence: true, length: { maximum: 255 }
   validates :app_category, presence: true, length: { maximum: 100 }
-  validates :apk_link, presence: true, format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]) }
+  validates :apk_link,
+            presence: true,
+            format: {
+              with: URI::DEFAULT_PARSER.make_regexp(%w[http https]),
+            }
   validates :apk_version, presence: true, length: { maximum: 50 }
   validates :author_rating, presence: true, inclusion: { in: 1..5 }
   validates :app_description, presence: true
@@ -82,7 +89,9 @@ class ::ApkReview < ActiveRecord::Base
 
     DB
       .query("SELECT * FROM (#{community_stats_sql}) stats WHERE topic_id IN (:ids)", ids: ids)
-      .to_h { |row| [row.topic_id, { average: row.community_avg.to_f, count: row.community_count }] }
+      .to_h do |row|
+        [row.topic_id, { average: row.community_avg.to_f, count: row.community_count }]
+      end
   end
 
   def self.community_rating_for(topic_id)
@@ -95,6 +104,37 @@ class ::ApkReview < ActiveRecord::Base
       SELECT SUM(community_sum)::float / NULLIF(SUM(community_count), 0)
       FROM (#{community_stats_sql}) stats
     SQL
+  end
+
+  # Returns [topic_id, app_name, previous_category] for every review found.
+  # Nothing is written unless apply is true. update_column skips validations
+  # on purpose: old reviews may not pass today's rules and that should not
+  # block a category move.
+  def self.move_to_category(topic_ids, new_category, apply: false)
+    if APP_CATEGORIES.exclude?(new_category)
+      raise ArgumentError, "unknown app category: #{new_category}"
+    end
+
+    where(topic_id: topic_ids)
+      .includes(topic: :tags)
+      .map do |review|
+        previous = review.app_category
+        if apply && previous != new_category
+          transaction do
+            review.update_column(:app_category, new_category)
+            topic = review.topic
+            topic.custom_fields["apk_app_category"] = new_category
+            topic.save_custom_fields
+            tags = topic.tags.map(&:name) - ["app-#{previous}"] + ["app-#{new_category}"]
+            DiscourseTagging.tag_topic_by_names(
+              topic,
+              Guardian.new(Discourse.system_user),
+              tags.uniq,
+            )
+          end
+        end
+        [review.topic_id, review.app_name, previous]
+      end
   end
 
   def self.user_rating_for(topic_id, user_id)
