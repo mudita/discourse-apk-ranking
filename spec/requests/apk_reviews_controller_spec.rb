@@ -267,6 +267,26 @@ describe ApkReviewsController do
     end
   end
 
+  describe "#update" do
+    it "records the edit in the topic without bumping it" do
+      author = Fabricate(:user)
+      topic = Fabricate(:topic, category: sideloaded_category, user: author)
+      Fabricate(:post, topic: topic, user: author)
+      review = apk_review_for_topic(topic)
+      bumped_at = 3.days.ago.change(usec: 0)
+      topic.update_column(:bumped_at, bumped_at)
+
+      sign_in(author)
+
+      put "/sideloaded-apps/reviews/#{topic.id}.json", params: { review: { apk_version: "1.2.4" } }
+
+      expect(response.status).to eq(200)
+      expect(review.reload.apk_version).to eq("1.2.4")
+      expect(topic.reload.posts.last.raw).to include("Review updated by")
+      expect(topic.bumped_at).to eq_time(bumped_at)
+    end
+  end
+
   describe "#track_download" do
     it "updates last_access_date when link is accessible" do
       topic = topic_in_sideloaded

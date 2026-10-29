@@ -534,6 +534,7 @@ class ::ApkReviewsController < ::ApplicationController
         topic_id: review.topic_id,
         raw: raw,
         skip_validations: true,
+        no_bump: true,
       )
 
     post.custom_fields["apk_audit_raw"] = canonical
