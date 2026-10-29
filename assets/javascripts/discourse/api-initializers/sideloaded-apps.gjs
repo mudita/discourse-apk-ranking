@@ -95,6 +95,7 @@ export default apiInitializer((api) => {
     "communication",
     "productivity",
     "utilities",
+    "tools",
     "health",
     "finance",
     "entertainment",
