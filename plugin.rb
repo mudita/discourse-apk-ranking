@@ -242,42 +242,8 @@ after_initialize do
     apk_topics = topics.select { |t| t.category&.slug == slug }
     next if apk_topics.empty?
 
-    topic_ids = apk_topics.map(&:id)
-    reviews = ApkReview.where(topic_id: topic_ids).index_by(&:topic_id)
-
-    # Community ratings: one per user (PluginStore overrides PostCustomField)
-    # 1. Reply ratings keyed by (topic_id, user_id)
-    reply_ratings_by_topic_user = {}
-    PostCustomField
-      .joins(:post)
-      .where(name: "apk_rating")
-      .where(posts: { topic_id: topic_ids, deleted_at: nil })
-      .where.not(posts: { post_number: 1 })
-      .pluck(Arel.sql("posts.topic_id, posts.user_id, post_custom_fields.value"))
-      .each do |tid, uid, val|
-        reply_ratings_by_topic_user[[tid, uid]] = val.to_i
-      end
-
-    # 2. PluginStore ratings override per user
-    key_patterns = topic_ids.map { |tid| "t#{tid}_u%" }
-    if key_patterns.any?
-      PluginStoreRow.where(plugin_name: "sideloaded_ratings").where(
-        key_patterns.map { "key LIKE ?" }.join(" OR "),
-        *key_patterns,
-      ).pluck(:key, :value).each do |key, val|
-        match = key.match(/\At(\d+)_u(\d+)\z/)
-        next unless match
-        tid = match[1].to_i
-        uid = match[2].to_i
-        reply_ratings_by_topic_user[[tid, uid]] = val.to_i
-      end
-    end
-
-    # Group by topic
-    ratings_by_topic = {}
-    reply_ratings_by_topic_user.each do |(tid, _uid), rating|
-      (ratings_by_topic[tid] ||= []) << rating
-    end
+    reviews = ApkReview.where(topic_id: apk_topics.map(&:id)).index_by(&:topic_id)
+    community_stats = ApkReview.community_stats_for(reviews.keys)
 
     apk_topics.each do |topic|
       review = reviews[topic.id]
@@ -296,13 +262,7 @@ after_initialize do
       # ApkReview) must never carry a rating — preload nil so the list renders
       # the "—" placeholder instead of a star value.
       if review
-        all_ratings = (ratings_by_topic[topic.id] || []).select { |r| r.between?(1, 5) }
-        if all_ratings.any?
-          avg = (all_ratings.sum.to_f / all_ratings.size).round(1)
-          topic.preload_apk_community_rating({ average: avg, count: all_ratings.size })
-        else
-          topic.preload_apk_community_rating({ average: 0.0, count: 0 })
-        end
+        topic.preload_apk_community_rating(community_stats[topic.id] || { average: 0.0, count: 0 })
       else
         topic.preload_apk_community_rating(nil)
       end
@@ -442,64 +402,37 @@ after_initialize do
       # Clicking the "Topic" column header → sort alphabetically by title
       result.order(Arel.sql("#{pinned_first}, LOWER(topics.title) #{direction}"))
     elsif sort_column == "community_rating"
-      # Explicit click on the Community Rating column.
-      #
-      # The aggregate MUST be computed the same way as the value rendered in
-      # the column (see TopicList.on_preload / ApkReview.community_rating_for):
-      # one rating per (topic, user), with the PluginStore rating taking
-      # precedence over the reply PostCustomField rating. Reply ratings are
-      # written to BOTH stores, so a naive UNION ALL double-counts them and the
-      # sort diverges from the displayed numbers (looks "unsorted"). DISTINCT ON
-      # dedups per (topic, user), preferring the PluginStore row (priority 0).
-      #
       # pinned_first keeps pinned topics on top regardless of rating — core
       # disables its own pin-priority for non-default/activity orders, so this
       # ORDER BY is what keeps pins pinned here.
-      result
-        .joins(
-          "LEFT JOIN (
-             SELECT topic_id,
-                    ROUND(AVG(rating), 1) AS community_avg,
-                    COUNT(*) AS community_count
-             FROM (
-               SELECT DISTINCT ON (topic_id, user_id) topic_id, user_id, rating
-               FROM (
-                 SELECT SUBSTRING(key FROM 't(\\d+)_u')::integer AS topic_id,
-                        SUBSTRING(key FROM 't\\d+_u(\\d+)')::integer AS user_id,
-                        value::integer AS rating,
-                        0 AS source_priority
-                 FROM plugin_store_rows
-                 WHERE plugin_name = 'sideloaded_ratings'
-                 UNION ALL
-                 SELECT posts.topic_id, posts.user_id,
-                        post_custom_fields.value::integer AS rating,
-                        1 AS source_priority
-                 FROM post_custom_fields
-                 INNER JOIN posts ON posts.id = post_custom_fields.post_id
-                 WHERE post_custom_fields.name = 'apk_rating'
-                   AND posts.deleted_at IS NULL
-                   AND posts.post_number > 1
-               ) sources
-               ORDER BY topic_id, user_id, source_priority
-             ) deduped
-             WHERE rating BETWEEN 1 AND 5
-             GROUP BY topic_id
-           ) community_ratings ON community_ratings.topic_id = topics.id",
-        )
-        .order(
-          # Pinned topics first (always on top), then by average; equal
-          # averages rank by number of ratings (more ratings = higher
-          # confidence), so a 5.0 with many ratings beats a 5.0 with one.
-          # The average is rounded to one decimal like the displayed value,
-          # otherwise a 4.98 shown as "5.0" sorts below a real 5.0 with one vote.
-          # bumped_at is a final deterministic tie-break for identical ratings.
-          Arel.sql(
-            "#{pinned_first}, " \
-              "COALESCE(community_ratings.community_avg, 0) #{direction}, " \
-              "COALESCE(community_ratings.community_count, 0) DESC, " \
-              "topics.bumped_at DESC",
-          ),
-        )
+      #
+      # Plain mode ranks by the average rounded like the displayed value,
+      # otherwise a 4.98 shown as "5.0" sorts below a real 5.0 with one vote.
+      # Weighted mode starts every app with `confidence` votes at the global
+      # average, so a handful of votes cannot outrank a long consistent record.
+      # Unrated apps stay last in both modes. Equal ranks go to the app with
+      # more votes, bumped_at is the final deterministic tie-break.
+      confidence = SiteSetting.sideloaded_apps_ranking_confidence_votes
+      rank =
+        if confidence > 0
+          prior = ApkReview.global_average_rating.to_f
+          "(#{confidence} * #{prior} + community_ratings.community_sum)::float / " \
+            "(#{confidence} + community_ratings.community_count)"
+        else
+          "community_ratings.community_avg"
+        end
+
+      result.joins(
+        "LEFT JOIN (#{ApkReview.community_stats_sql}) community_ratings " \
+          "ON community_ratings.topic_id = topics.id",
+      ).order(
+        Arel.sql(
+          "#{pinned_first}, " \
+            "COALESCE(#{rank}, 0) #{direction}, " \
+            "COALESCE(community_ratings.community_count, 0) DESC, " \
+            "topics.bumped_at DESC",
+        ),
+      )
     elsif column_sort
       # Core keeps pins on top only for the activity order, so every other
       # sortable column has to put them first here.

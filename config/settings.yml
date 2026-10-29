@@ -7,6 +7,11 @@ plugins:
     default: "sideloaded-apps-ranking"
     client: true
     description: "Slug of the category used for the Community Apps Ranking (must match the category you create)"
+  sideloaded_apps_ranking_confidence_votes:
+    default: 0
+    min: 0
+    max: 100
+    description: "Weighted ranking: how many votes at the catalog average every app starts with. 0 ranks by the plain average."
   sideloaded_apps_verification_enabled:
     default: true
     client: true

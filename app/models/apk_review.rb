@@ -37,37 +37,64 @@ class ::ApkReview < ActiveRecord::Base
     APP_CATEGORIES
   end
 
-  # Community average: one rating per user (PluginStore is source of truth,
-  # PostCustomField is fallback for users who rated before PluginStore migration)
+  # Single source for community ratings: the topic list, the sort order and
+  # the topic page all read this, so the shown value and the rank never drift.
+  # One rating per (topic, user). Reply ratings are written to both stores and
+  # the PluginStore row wins (users who rated before the PluginStore existed
+  # only have the reply field), so a reply is never counted twice. Topics
+  # without an ApkReview (info posts) never get a rating.
+  def self.community_stats_sql
+    <<~SQL
+      SELECT deduped.topic_id,
+             ROUND(AVG(deduped.rating), 1) AS community_avg,
+             COUNT(*) AS community_count,
+             SUM(deduped.rating) AS community_sum
+      FROM (
+        SELECT DISTINCT ON (topic_id, user_id) topic_id, user_id, rating
+        FROM (
+          SELECT SUBSTRING(key FROM 't(\\d+)_u')::integer AS topic_id,
+                 SUBSTRING(key FROM 't\\d+_u(\\d+)')::integer AS user_id,
+                 value::integer AS rating,
+                 0 AS source_priority
+          FROM plugin_store_rows
+          WHERE plugin_name = 'sideloaded_ratings'
+          UNION ALL
+          SELECT posts.topic_id, posts.user_id,
+                 post_custom_fields.value::integer AS rating,
+                 1 AS source_priority
+          FROM post_custom_fields
+          INNER JOIN posts ON posts.id = post_custom_fields.post_id
+          WHERE post_custom_fields.name = 'apk_rating'
+            AND posts.deleted_at IS NULL
+            AND posts.post_number > 1
+        ) sources
+        ORDER BY topic_id, user_id, source_priority
+      ) deduped
+      INNER JOIN apk_reviews ON apk_reviews.topic_id = deduped.topic_id
+      WHERE deduped.rating BETWEEN 1 AND 5
+      GROUP BY deduped.topic_id
+    SQL
+  end
+
+  def self.community_stats_for(topic_ids)
+    ids = Array(topic_ids).map(&:to_i)
+    return {} if ids.empty?
+
+    DB
+      .query("SELECT * FROM (#{community_stats_sql}) stats WHERE topic_id IN (:ids)", ids: ids)
+      .to_h { |row| [row.topic_id, { average: row.community_avg.to_f, count: row.community_count }] }
+  end
+
   def self.community_rating_for(topic_id)
-    ratings_by_user = {}
+    community_stats_for([topic_id])[topic_id.to_i] || { average: 0.0, count: 0 }
+  end
 
-    # 1. Collect reply ratings keyed by user_id
-    PostCustomField
-      .joins(:post)
-      .where(name: "apk_rating")
-      .where(posts: { topic_id: topic_id, deleted_at: nil })
-      .where.not(posts: { post_number: 1 })
-      .pluck(Arel.sql("posts.user_id"), :value)
-      .each { |uid, val| ratings_by_user[uid] = val.to_i }
-
-    # 2. PluginStore ratings override (source of truth)
-    PluginStoreRow
-      .where(plugin_name: "sideloaded_ratings")
-      .where("key LIKE ?", "t#{topic_id}_u%")
-      .pluck(:key, :value)
-      .each do |key, val|
-        uid = key.match(/\At\d+_u(\d+)\z/)&.captures&.first&.to_i
-        next unless uid
-        ratings_by_user[uid] = val.to_i
-      end
-
-    all_ratings = ratings_by_user.values.select { |r| r.between?(1, 5) }
-    if all_ratings.any?
-      { average: (all_ratings.sum.to_f / all_ratings.size).round(1), count: all_ratings.size }
-    else
-      { average: 0.0, count: 0 }
-    end
+  # Mean of every community rating across all apps, the prior for the weighted rank.
+  def self.global_average_rating
+    DB.query_single(<<~SQL).first
+      SELECT SUM(community_sum)::float / NULLIF(SUM(community_count), 0)
+      FROM (#{community_stats_sql}) stats
+    SQL
   end
 
   def self.user_rating_for(topic_id, user_id)

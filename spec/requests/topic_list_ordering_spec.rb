@@ -52,6 +52,7 @@ describe "Sideloaded apps topic list ordering" do
   it "ranks by the displayed rounded rating, then by number of ratings" do
     pinned_topic.update!(pinned_at: nil)
     single_vote = Fabricate(:topic, category: category)
+    [single_vote, popular_topic].each { |topic| Fabricate(:apk_review, topic: topic) }
     PluginStore.set("sideloaded_ratings", "t#{single_vote.id}_u#{user.id}", 5)
     # 19 x 5 + 1 x 4 = 4.95, displayed as 5.0
     20.times do |i|
@@ -64,6 +65,7 @@ describe "Sideloaded apps topic list ordering" do
   it "orders 5.0(10), 5.0(32), 4.2(19), 4.0(10), 4.2(5) by rating, then by rating count" do
     pinned_topic.update!(pinned_at: nil)
     rate = ->(topic, ratings) do
+      Fabricate(:apk_review, topic: topic)
       ratings.each_with_index do |r, i|
         PluginStore.set("sideloaded_ratings", "t#{topic.id}_u#{2000 + i}", r)
       end
@@ -81,6 +83,62 @@ describe "Sideloaded apps topic list ordering" do
     expect(topic_ids(order: "community_rating").first(5)).to eq(
       [five_32, five_10, four_two_19, four_two_5, four_10].map(&:id),
     )
+  end
+
+  describe "weighted ranking" do
+    def rated_app(ratings, first_user_id)
+      topic = Fabricate(:topic, category: category)
+      Fabricate(:apk_review, topic: topic)
+      ratings.each_with_index do |rating, i|
+        PluginStore.set("sideloaded_ratings", "t#{topic.id}_u#{first_user_id + i}", rating)
+      end
+      topic
+    end
+
+    fab!(:single_five) { rated_app([5], 3000) }
+    # 4.8 over 20 votes
+    fab!(:steady_app) { rated_app([5] * 16 + [4] * 4, 3100) }
+    # pulls the catalog average down to about 3.9
+    fab!(:weak_app) { rated_app([2] * 10, 3200) }
+
+    before { pinned_topic.update!(pinned_at: nil) }
+
+    it "ranks by the plain average when disabled" do
+      SiteSetting.sideloaded_apps_ranking_confidence_votes = 0
+
+      expect(topic_ids(order: "community_rating").first(3)).to eq(
+        [single_five, steady_app, weak_app].map(&:id),
+      )
+    end
+
+    it "lets a long consistent record outrank a single vote when enabled" do
+      SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
+
+      expect(topic_ids(order: "community_rating").first(3)).to eq(
+        [steady_app, single_five, weak_app].map(&:id),
+      )
+    end
+
+    it "keeps showing the plain average in the list" do
+      SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
+
+      get "/c/#{category.slug}/#{category.id}/l/latest.json", params: { order: "community_rating" }
+      steady = response.parsed_body["topic_list"]["topics"].find { |t| t["id"] == steady_app.id }
+
+      expect(steady["apk_community_average"]).to eq(4.8)
+      expect(steady["apk_community_count"]).to eq(20)
+    end
+  end
+
+  it "ignores ratings stored for topics that are not app reviews" do
+    pinned_topic.update!(pinned_at: nil)
+    reviewed = Fabricate(:topic, category: category)
+    Fabricate(:apk_review, topic: reviewed)
+    PluginStore.set("sideloaded_ratings", "t#{reviewed.id}_u#{user.id}", 3)
+    PluginStore.set("sideloaded_ratings", "t#{popular_topic.id}_u#{user.id}", 5)
+
+    expect(topic_ids(order: "community_rating").first).to eq(reviewed.id)
+    expect(ApkReview.community_rating_for(popular_topic.id)).to eq(average: 0.0, count: 0)
   end
 
   it "does not keep a pin on top once the user has dismissed it" do
