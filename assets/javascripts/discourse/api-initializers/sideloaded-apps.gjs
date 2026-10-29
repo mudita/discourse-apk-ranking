@@ -6,6 +6,7 @@ import { action } from "@ember/object";
 import SortableColumn from "discourse/components/topic-list/header/sortable-column";
 import { ajax } from "discourse/lib/ajax";
 import { apiInitializer } from "discourse/lib/api";
+import { shortDate } from "discourse/lib/formatter";
 import { i18n } from "discourse-i18n";
 import ApkComposerFields, {
   clearPendingApkData,
@@ -661,6 +662,34 @@ export default apiInitializer((api) => {
             />
           </a>
         {{/if}}
+      </template>
+    }
+  );
+
+  // ── 8b. TOPIC LIST: "Updated" label after the title ──
+  // Version and checksum updates no longer bump the topic, so this label is
+  // how people without GitHub or Obtainium notice a new release.
+  api.renderInOutlet(
+    "topic-list-after-title",
+    class SideloadedUpdatedBadge extends Component {
+      static shouldRender(args) {
+        const days = siteSettings.sideloaded_apps_updated_badge_days;
+        const updatedAt = args.topic?.apk_version_updated_at;
+        if (!days || !updatedAt) {
+          return false;
+        }
+        return Date.now() - new Date(updatedAt).getTime() < days * 86_400_000;
+      }
+
+      get date() {
+        return shortDate(this.args.outletArgs.topic.apk_version_updated_at);
+      }
+
+      <template>
+        <span
+          class="sideloaded-updated-badge"
+          title={{i18n "sideloaded_apps.updated_badge_title" date=this.date}}
+        >{{i18n "sideloaded_apps.updated_badge" date=this.date}}</span>
       </template>
     }
   );

@@ -76,6 +76,20 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_css(row(calculator))
   end
 
+  it "labels recently updated apps until the label window passes" do
+    SiteSetting.sideloaded_apps_updated_badge_days = 14
+    fresh = app_topic("Fresh Release")
+    stale = app_topic("Old Release")
+    ApkReview.find_by(topic_id: fresh.id).update!(version_updated_at: 2.days.ago)
+    ApkReview.find_by(topic_id: stale.id).update!(version_updated_at: 30.days.ago)
+
+    visit("/c/#{category.slug}/#{category.id}")
+
+    expect(page).to have_css("#{row(fresh)} .sideloaded-updated-badge", text: "Updated")
+    expect(page).to have_css(row(stale))
+    expect(page).to have_no_css("#{row(stale)} .sideloaded-updated-badge")
+  end
+
   it "offers Tools in the app submission form" do
     sign_in(user)
 

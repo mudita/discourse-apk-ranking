@@ -984,6 +984,19 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   margin-right: 6px;
 }
 
+.sideloaded-updated-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  margin-left: 6px;
+  border-radius: 10px;
+  background: rgba($sl-primary, 0.1);
+  color: $sl-primary;
+  font-size: 0.75em;
+  font-weight: 500;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .sideloaded-app-category-badge {
   display: inline-block;
   padding: 2px 10px;

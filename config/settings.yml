@@ -12,6 +12,12 @@ plugins:
     min: 0
     max: 100
     description: "Weighted ranking: how many votes at the catalog average every app starts with. 0 ranks by the plain average."
+  sideloaded_apps_updated_badge_days:
+    default: 14
+    min: 0
+    max: 365
+    client: true
+    description: "How many days the \"Updated\" label stays next to an app after its version or checksum changes. 0 hides the label."
   sideloaded_apps_verification_enabled:
     default: true
     client: true

@@ -288,6 +288,27 @@ describe ApkReviewsController do
       expect(topic.reload.posts.last.raw).to include("Review updated by")
       expect(topic.bumped_at).to eq_time(bumped_at)
     end
+
+    it "dates a version or checksum change but not a description edit" do
+      author = Fabricate(:user)
+      topic = Fabricate(:topic, category: sideloaded_category, user: author)
+      Fabricate(:post, topic: topic, user: author)
+      review = apk_review_for_topic(topic)
+
+      sign_in(author)
+
+      put "/sideloaded-apps/reviews/#{topic.id}.json",
+          params: { review: { app_description: "A rewritten description, long enough." } }
+      expect(review.reload.version_updated_at).to be_nil
+
+      freeze_time
+      put "/sideloaded-apps/reviews/#{topic.id}.json", params: { review: { apk_version: "2.0.0" } }
+      expect(review.reload.version_updated_at).to eq_time(Time.current)
+
+      get "/c/#{sideloaded_category.slug}/#{sideloaded_category.id}/l/latest.json"
+      listed = response.parsed_body["topic_list"]["topics"].find { |t| t["id"] == topic.id }
+      expect(Time.zone.parse(listed["apk_version_updated_at"])).to eq_time(Time.current)
+    end
   end
 
   describe "#track_download" do

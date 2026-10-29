@@ -84,6 +84,9 @@ class ::ApkReviewsController < ::ApplicationController
     mmd_dedicated_param = params.dig(:review, :mmd_dedicated)
 
     if review.update(review_params)
+      if review.saved_change_to_apk_version? || review.saved_change_to_apk_checksum?
+        review.update_column(:version_updated_at, Time.current)
+      end
       update_topic_icon_url(review.topic, icon_url_param)
       update_topic_mmd_dedicated(review.topic, mmd_dedicated_param)
       create_edit_audit_post(review, old_attrs)

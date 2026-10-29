@@ -173,6 +173,8 @@ en:
 
       dev_badge: "DEV"
       dev_badge_title: "Review author is the app developer"
+      updated_badge: "Updated %{date}"
+      updated_badge_title: "A new version or file was published on %{date}"
       mmd_badge: "MMD"
       mmd_badge_title: "Dedicated for Mudita Kompakt"
       report_outdated: "Report outdated version"

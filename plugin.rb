@@ -225,6 +225,7 @@ after_initialize do
           app_category: review.app_category,
           author_rating: review.author_rating,
           last_access_date: review.last_access_date,
+          version_updated_at: review.version_updated_at,
         }
       end
   end
@@ -254,6 +255,7 @@ after_initialize do
             app_category: review.app_category,
             author_rating: review.author_rating,
             last_access_date: review.last_access_date,
+            version_updated_at: review.version_updated_at,
           }
         end,
       )
@@ -331,6 +333,11 @@ after_initialize do
   add_to_serializer(:topic_list_item, :apk_last_access_date) do
     return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
     object.apk_review_data&.dig(:last_access_date)
+  end
+
+  add_to_serializer(:topic_list_item, :apk_version_updated_at) do
+    return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    object.apk_review_data&.dig(:version_updated_at)
   end
 
   add_to_serializer(:topic_list_item, :apk_author_is_developer) do
