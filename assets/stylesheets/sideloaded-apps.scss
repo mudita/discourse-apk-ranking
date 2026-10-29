@@ -253,7 +253,7 @@ body.sideloaded-apps-category {
 
 // ── Category filter — hide non-matching topic rows ──
 $apk-categories:
-  communication, social, productivity, utilities, health, finance,
+  communication, social, productivity, utilities, tools, health, finance,
   entertainment, music, navigation, weather, news, education, other;
 
 @each $cat in $apk-categories {

@@ -476,6 +476,7 @@ export default class ApkComposerFields extends Component {
         value: "utilities",
         label: i18n("sideloaded_apps.categories.utilities"),
       },
+      { value: "tools", label: i18n("sideloaded_apps.categories.tools") },
       { value: "health", label: i18n("sideloaded_apps.categories.health") },
       { value: "finance", label: i18n("sideloaded_apps.categories.finance") },
       {

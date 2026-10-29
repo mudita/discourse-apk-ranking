@@ -21,6 +21,7 @@ class ::ApkReview < ActiveRecord::Base
     social
     productivity
     utilities
+    tools
     health
     finance
     entertainment
