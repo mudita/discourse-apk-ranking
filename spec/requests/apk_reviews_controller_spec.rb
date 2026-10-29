@@ -84,7 +84,7 @@ describe ApkReviewsController do
            }
 
       expect(response.status).to eq(422)
-      expect(response.parsed_body["error"]).to include("Sideloaded Apps Ranking category")
+      expect(response.parsed_body["error"]).to include("Community Apps Ranking category")
     end
 
     it "allows topic author to create review" do
@@ -250,7 +250,7 @@ describe ApkReviewsController do
       expect(parsed["user_rating"]).to eq(4)
     end
 
-    it "rejects duplicate rating" do
+    it "replaces the user's previous rating instead of adding a second one" do
       topic = topic_in_sideloaded
       apk_review_for_topic(topic)
       rater = Fabricate(:user)
@@ -260,10 +260,13 @@ describe ApkReviewsController do
       post "/sideloaded-apps/rate.json", params: { topic_id: topic.id, rating: 4 }
       expect(response.status).to eq(200)
 
-      post "/sideloaded-apps/rate.json", params: { topic_id: topic.id, rating: 5 }
+      post "/sideloaded-apps/rate.json", params: { topic_id: topic.id, rating: 2 }
 
-      expect(response.status).to eq(422)
-      expect(response.parsed_body["error"]).to include("already rated")
+      expect(response.status).to eq(200)
+      parsed = response.parsed_body
+      expect(parsed["user_rating"]).to eq(2)
+      expect(parsed["community_average"]).to eq(2.0)
+      expect(parsed["community_count"]).to eq(1)
     end
   end
 
@@ -271,7 +274,8 @@ describe ApkReviewsController do
     it "updates last_access_date when link is accessible" do
       topic = topic_in_sideloaded
       review = apk_review_for_topic(topic)
-      original_date = review.last_access_date
+      original_date = 3.days.ago
+      review.update_column(:last_access_date, original_date)
 
       allow_any_instance_of(ApkReviewsController).to receive(:probe_url) do
         double("response", code: "200")
@@ -283,7 +287,7 @@ describe ApkReviewsController do
 
       expect(response.status).to eq(200)
       expect(response.parsed_body["success"]).to eq(true)
-      expect(review.reload.last_access_date).to be >= original_date
+      expect(review.reload.last_access_date).to be > original_date
     end
   end
 end
