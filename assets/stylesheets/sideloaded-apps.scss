@@ -615,13 +615,7 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   }
 
   &__category-badge {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 12px;
-    background: rgba($sl-primary, 0.1);
-    color: $sl-primary;
     font-size: 0.8em;
-    font-weight: 500;
   }
 
   &__header-actions {
@@ -997,17 +991,29 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   white-space: nowrap;
 }
 
-.sideloaded-app-category-badge {
+// Same 130x25 tag shape the theme gives forum tags.
+.sideloaded-app-category-badge,
+.sideloaded-review-display__category-badge {
   display: inline-block;
-  padding: 2px 10px;
-  margin-right: 6px;
-  border-radius: 10px;
+  box-sizing: border-box;
+  width: 130px;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 4px;
   background: rgba($sl-primary, 0.1);
   color: $sl-primary;
-  font-size: 0.75em;
   font-weight: 500;
+  line-height: 25px;
+  text-align: center;
   vertical-align: middle;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sideloaded-app-category-badge {
+  margin-right: 6px;
+  font-size: 0.75em;
 }
 
 .sideloaded-rating-column {
@@ -1103,16 +1109,7 @@ body.sideloaded-apps-category .topic-list {
   }
 
   .sideloaded-col .sideloaded-app-category-badge {
-    box-sizing: border-box;
-    width: 130px;
-    height: 25px;
     margin: 0;
-    padding: 0 8px;
-    border-radius: 4px;
-    line-height: 25px;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .sideloaded-col .sideloaded-topic-list-icon {

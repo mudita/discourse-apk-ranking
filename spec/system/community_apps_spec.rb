@@ -109,6 +109,21 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_css("#{row(plain)} .main-link .sideloaded-app-category-badge")
   end
 
+  it "keeps the 130x25 category pill next to the title on mobile", mobile: true do
+    app = app_topic("Mobile App", app_category: "tools")
+
+    visit("/c/#{category.slug}/#{category.id}")
+
+    pill = "#{row(app)} .sideloaded-app-category-badge"
+    expect(page).to have_css(pill, text: "Tools")
+    size =
+      page.evaluate_script(
+        "(() => { const b = document.querySelector(#{pill.to_json}).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()",
+      )
+    expect(size).to eq([130, 25])
+    expect(page).to have_no_css("#{row(app)} td.sideloaded-col--category")
+  end
+
   it "labels recently updated apps until the label window passes" do
     SiteSetting.sideloaded_apps_updated_badge_days = 14
     fresh = app_topic("Fresh Release")
