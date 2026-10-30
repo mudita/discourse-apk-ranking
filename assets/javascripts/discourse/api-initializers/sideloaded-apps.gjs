@@ -691,33 +691,36 @@ export default apiInitializer((api) => {
     return columns;
   });
 
-  // ── 8. TOPIC LIST (mobile): app icon instead of the avatar, badges under
-  // the title. Desktop renders these as columns (see the transformer above).
+  // ── 8. TOPIC LIST (mobile): app icon instead of the avatar (blank when the
+  // app has none), badges under the title. Desktop renders these as columns
+  // (see the transformer above).
   api.renderInOutlet(
     "topic-list-item-mobile-avatar",
     class SideloadedMobileAppIcon extends Component {
       static shouldRender(args) {
-        return !!args.topic?.apk_app_name && !!args.topic?.apk_icon_url;
+        return !!args.topic?.apk_app_name;
       }
 
       <template>
-        <a
-          href={{@outletArgs.topic.url}}
-          class="sideloaded-topic-list-icon-link"
-          data-topic-id={{@outletArgs.topic.id}}
-        >
-          <img
-            src={{@outletArgs.topic.apk_icon_url}}
-            alt=""
-            class="sideloaded-topic-list-icon"
-          />
-        </a>
+        {{#if @outletArgs.topic.apk_icon_url}}
+          <a
+            href={{@outletArgs.topic.url}}
+            class="sideloaded-topic-list-icon-link"
+            data-topic-id={{@outletArgs.topic.id}}
+          >
+            <img
+              src={{@outletArgs.topic.apk_icon_url}}
+              alt=""
+              class="sideloaded-topic-list-icon"
+            />
+          </a>
+        {{else}}
+          <span class="sideloaded-topic-list-icon-blank"></span>
+        {{/if}}
       </template>
     }
   );
 
-  // Fixed slots, empty ones included, keep MMD and DEV in the same place on
-  // every row. The second slot is reserved for the InkApps badge.
   api.renderInOutlet(
     "topic-list-main-link-bottom",
     class SideloadedMobileAppBadges extends Component {
@@ -734,19 +737,14 @@ export default apiInitializer((api) => {
               {{appCategoryLabel @outletArgs.topic}}
             </span>
           {{/if}}
-          <span class="sideloaded-mobile-badges__slot --inkapps"></span>
-          <span class="sideloaded-mobile-badges__slot --mmd">
-            {{#if @outletArgs.topic.apk_mmd_dedicated}}
-              <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
-            {{/if}}
-          </span>
-          <span class="sideloaded-mobile-badges__slot --dev">
-            {{#if @outletArgs.topic.apk_author_is_developer}}
-              <span class="sideloaded-dev-badge">{{i18n
-                  "sideloaded_apps.dev_badge"
-                }}</span>
-            {{/if}}
-          </span>
+          {{#if @outletArgs.topic.apk_mmd_dedicated}}
+            <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
+          {{/if}}
+          {{#if @outletArgs.topic.apk_author_is_developer}}
+            <span class="sideloaded-dev-badge">{{i18n
+                "sideloaded_apps.dev_badge"
+              }}</span>
+          {{/if}}
         </div>
       </template>
     }

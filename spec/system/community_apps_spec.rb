@@ -116,47 +116,49 @@ describe "Community Apps", type: :system do
     app.custom_fields["apk_author_is_developer"] = "true"
     app.save_custom_fields
     no_icon = app_topic("No Icon App")
+    no_icon.custom_fields["apk_author_is_developer"] = "true"
+    no_icon.save_custom_fields
 
     visit("/c/#{category.slug}/#{category.id}")
 
-    pill = "#{row(app)} .main-link .sideloaded-mobile-badges .sideloaded-app-category-badge"
-    expect(page).to have_css(pill, text: "Tools")
-    size =
-      page.evaluate_script(
-        "(() => { const b = document.querySelector(#{pill.to_json}).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()",
-      )
-    expect(size).to eq([130, 25])
-
-    slots = all("#{row(app)} .sideloaded-mobile-badges > *").map { |el| el[:class] }
-    expect(slots).to eq(
+    badges = "#{row(app)} .main-link .sideloaded-mobile-badges"
+    expect(page).to have_css("#{badges} .sideloaded-app-category-badge", text: "Tools")
+    expect(all("#{badges} > *").map { |el| el[:class] }).to eq(
       [
         "sideloaded-app-category-badge",
-        "sideloaded-mobile-badges__slot --inkapps",
-        "sideloaded-mobile-badges__slot --mmd",
-        "sideloaded-mobile-badges__slot --dev",
+        "sideloaded-mmd-badge sideloaded-topic-list-mmd-badge",
+        "sideloaded-dev-badge",
       ],
     )
-    expect(page).to have_css("#{row(app)} .--mmd .sideloaded-mmd-badge")
-    expect(page).to have_css("#{row(app)} .--dev .sideloaded-dev-badge")
 
     geometry = page.evaluate_script(<<~JS)
         (() => {
-          const row = document.querySelector(#{row(app).to_json});
-          const box = (sel) => row.querySelector(sel).getBoundingClientRect();
+          const box = (row, sel) => document.querySelector(`${row} ${sel}`).getBoundingClientRect();
           const middle = (r) => Math.round(r.top + r.height / 2);
+          const app = #{row(app).to_json};
+          const pill = box(app, ".sideloaded-app-category-badge");
           return {
-            icon_vs_count: Math.abs(middle(box(".pull-left")) - middle(box(".pull-right"))),
-            pill_vs_dev: Math.abs(middle(box(".sideloaded-app-category-badge")) - middle(box(".sideloaded-dev-badge"))),
+            pill: [Math.round(pill.width), Math.round(pill.height)],
+            pill_to_mmd: Math.round(box(app, ".sideloaded-mmd-badge").left - pill.right),
+            icon_vs_count: Math.abs(middle(box(app, ".pull-left")) - middle(box(app, ".pull-right"))),
+            pill_vs_dev: Math.abs(middle(pill) - middle(box(app, ".sideloaded-dev-badge"))),
+            no_icon_pill_to_dev: Math.round(
+              box(#{row(no_icon).to_json}, ".sideloaded-dev-badge").left -
+                box(#{row(no_icon).to_json}, ".sideloaded-app-category-badge").right,
+            ),
           };
         })()
       JS
+    expect(geometry["pill"]).to eq([118, 22])
+    expect(geometry["pill_to_mmd"]).to eq(6)
+    expect(geometry["no_icon_pill_to_dev"]).to eq(6)
     expect(geometry["icon_vs_count"]).to be <= 2
     expect(geometry["pill_vs_dev"]).to be <= 2
 
     expect(page).to have_css("#{row(app)} .pull-left img.sideloaded-topic-list-icon")
     expect(page).to have_no_css("#{row(app)} .pull-left img.avatar")
-    expect(page).to have_css("#{row(no_icon)} .pull-left img.avatar")
-    expect(page).to have_no_css("#{row(no_icon)} .sideloaded-dev-badge")
+    expect(page).to have_css("#{row(no_icon)} .pull-left .sideloaded-topic-list-icon-blank")
+    expect(page).to have_no_css("#{row(no_icon)} .pull-left img")
   end
 
   it "labels recently updated apps until the label window passes" do
