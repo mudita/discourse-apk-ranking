@@ -269,6 +269,9 @@ export default class ApkComposerFields extends Component {
         return null;
       }
       case "authorRating":
+        if (this.authorIsDeveloper) {
+          return null;
+        }
         if (
           !this.authorRating ||
           this.authorRating < 1 ||
@@ -537,7 +540,7 @@ export default class ApkComposerFields extends Component {
       apk_link: this.apkLink.trim(),
       apk_version: this.apkVersion.trim(),
       apk_checksum: checksumForSave,
-      author_rating: this.authorRating,
+      author_rating: this.authorIsDeveloper ? null : this.authorRating,
       app_description: this.appDescription.trim(),
       known_issues: this.knownIssues.trim(),
       is_direct_download: this.linkIsDirectDownload,
@@ -555,7 +558,9 @@ export default class ApkComposerFields extends Component {
       apk_app_category: this.appCategory,
       apk_link: this.apkLink.trim(),
       apk_version: version,
-      apk_author_rating: String(this.authorRating),
+      apk_author_rating: this.authorIsDeveloper
+        ? ""
+        : String(this.authorRating),
       apk_description: this.appDescription.trim(),
       apk_known_issues: this.knownIssues.trim(),
       apk_checksum: checksumForSave,
@@ -623,6 +628,7 @@ export default class ApkComposerFields extends Component {
   toggleAuthorIsDeveloper(event) {
     this.authorIsDeveloper = event.target.checked;
     this._syncToModel();
+    this.validateField("authorRating");
   }
 
   @action
@@ -781,26 +787,6 @@ export default class ApkComposerFields extends Component {
         {{/if}}
       </div>
 
-      <div
-        class="sideloaded-form__field
-          {{if this.fieldErrors.authorRating '--has-error'}}"
-      >
-        <label>{{i18n "sideloaded_apps.form.author_rating"}}</label>
-        <ApkStarRating
-          @rating={{this.authorRating}}
-          @interactive={{true}}
-          @onRate={{this.setRating}}
-        />
-        <span class="sideloaded-form__help">{{i18n
-            "sideloaded_apps.form.author_rating_help"
-          }}</span>
-        {{#if this.fieldErrors.authorRating}}
-          <span
-            class="sideloaded-form__error"
-          >{{this.fieldErrors.authorRating}}</span>
-        {{/if}}
-      </div>
-
       <div class="sideloaded-form__field sideloaded-form__field--checkbox">
         <label>
           <input
@@ -811,6 +797,32 @@ export default class ApkComposerFields extends Component {
           {{i18n "sideloaded_apps.form.author_is_developer"}}
         </label>
       </div>
+
+      {{#if this.authorIsDeveloper}}
+        <p class="sideloaded-form__help sideloaded-form__help--developer">
+          {{i18n "sideloaded_apps.form.developer_no_rating"}}
+        </p>
+      {{else}}
+        <div
+          class="sideloaded-form__field
+            {{if this.fieldErrors.authorRating '--has-error'}}"
+        >
+          <label>{{i18n "sideloaded_apps.form.author_rating"}}</label>
+          <ApkStarRating
+            @rating={{this.authorRating}}
+            @interactive={{true}}
+            @onRate={{this.setRating}}
+          />
+          <span class="sideloaded-form__help">{{i18n
+              "sideloaded_apps.form.author_rating_help"
+            }}</span>
+          {{#if this.fieldErrors.authorRating}}
+            <span
+              class="sideloaded-form__error"
+            >{{this.fieldErrors.authorRating}}</span>
+          {{/if}}
+        </div>
+      {{/if}}
 
       <div class="sideloaded-form__field sideloaded-form__field--checkbox">
         <label>

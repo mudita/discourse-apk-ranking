@@ -51,6 +51,7 @@ describe "Sideloaded apps topic list ordering" do
 
   it "ranks by the displayed rounded rating, then by number of ratings" do
     pinned_topic.update!(pinned_at: nil)
+    SiteSetting.sideloaded_apps_ranking_confidence_votes = 0
     single_vote = Fabricate(:topic, category: category)
     [single_vote, popular_topic].each { |topic| Fabricate(:apk_review, topic: topic) }
     PluginStore.set("sideloaded_ratings", "t#{single_vote.id}_u#{user.id}", 5)
@@ -62,8 +63,22 @@ describe "Sideloaded apps topic list ordering" do
     expect(topic_ids(order: "community_rating").first(2)).to eq([popular_topic.id, single_vote.id])
   end
 
+  it "breaks a weighted tie by the number of votes when the catalog average is near 5" do
+    pinned_topic.update!(pinned_at: nil)
+    SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
+    single_vote = Fabricate(:topic, category: category)
+    [single_vote, popular_topic].each { |topic| Fabricate(:apk_review, topic: topic) }
+    PluginStore.set("sideloaded_ratings", "t#{single_vote.id}_u#{user.id}", 5)
+    20.times do |i|
+      PluginStore.set("sideloaded_ratings", "t#{popular_topic.id}_u#{1000 + i}", i.zero? ? 4 : 5)
+    end
+
+    expect(topic_ids(order: "community_rating").first(2)).to eq([popular_topic.id, single_vote.id])
+  end
+
   it "orders 5.0(10), 5.0(32), 4.2(19), 4.0(10), 4.2(5) by rating, then by rating count" do
     pinned_topic.update!(pinned_at: nil)
+    SiteSetting.sideloaded_apps_ranking_confidence_votes = 0
     rate = ->(topic, ratings) do
       Fabricate(:apk_review, topic: topic)
       ratings.each_with_index do |r, i|

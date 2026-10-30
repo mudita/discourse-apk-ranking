@@ -43,6 +43,7 @@ en:
         author_rating: "Your rating for the App"
         author_rating_help: "Rate this app 1-5 stars based on usability on Kompakt"
         author_is_developer: "I am the developer of this app"
+        developer_no_rating: "As the developer you don't rate your own app. Its rating comes from other members."
         mmd_dedicated: "This app is dedicated for Mudita Kompakt (MMD)"
         icon_url: "App icon URL (optional)"
         icon_url_placeholder: "https://..."

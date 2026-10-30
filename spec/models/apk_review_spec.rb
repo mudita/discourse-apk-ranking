@@ -3,6 +3,38 @@
 require "rails_helper"
 
 describe ApkReview do
+  describe ".author_rating_from" do
+    it "gives developers no rating" do
+      fields = { "apk_author_is_developer" => "true", "apk_author_rating" => "5" }
+      expect(ApkReview.author_rating_from(fields)).to be_nil
+    end
+
+    it "clamps the rating of other reviewers and defaults a missing one to 3" do
+      expect(ApkReview.author_rating_from("apk_author_rating" => "9")).to eq(5)
+      expect(ApkReview.author_rating_from("apk_author_rating" => "")).to eq(3)
+      expect(ApkReview.author_rating_from("apk_author_is_developer" => "false")).to eq(3)
+    end
+  end
+
+  describe "author rating validation" do
+    fab!(:topic)
+
+    it "requires a rating from a reviewer who is not the developer" do
+      review = Fabricate.build(:apk_review, topic: topic, author_rating: nil)
+
+      expect(review).not_to be_valid
+      expect(review.errors[:author_rating]).to be_present
+    end
+
+    it "rejects a rating on a developer's review" do
+      topic.custom_fields["apk_author_is_developer"] = "true"
+      topic.save_custom_fields
+
+      expect(Fabricate.build(:apk_review, topic: topic, author_rating: 4)).not_to be_valid
+      expect(Fabricate.build(:apk_review, topic: topic, author_rating: nil)).to be_valid
+    end
+  end
+
   describe ".move_to_category" do
     fab!(:category) { Fabricate(:category, slug: "sideloaded-apps-ranking") }
     fab!(:topic) { Fabricate(:topic, category: category) }

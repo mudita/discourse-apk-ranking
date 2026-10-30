@@ -377,6 +377,9 @@ export default class ApkReviewDisplay extends Component {
         }
         break;
       case "_editRating":
+        if (this.review.author_is_developer) {
+          return null;
+        }
         if (!this._editRating || this._editRating < 1 || this._editRating > 5) {
           error = i18n("sideloaded_apps.form.validation.rating_required");
         }
@@ -607,7 +610,9 @@ export default class ApkReviewDisplay extends Component {
         apk_link: this._editLink.trim(),
         app_description: this._editDescription.trim(),
         known_issues: this._editKnownIssues.trim(),
-        author_rating: this._editRating,
+        ...(this.review.author_is_developer
+          ? {}
+          : { author_rating: this._editRating }),
         apk_checksum: this.isEditChecksumDisabled
           ? ""
           : this._editChecksum.trim(),
@@ -816,19 +821,21 @@ export default class ApkReviewDisplay extends Component {
               </div>
             {{/unless}}
 
-            <div class="sideloaded-form__field">
-              <label>{{i18n "sideloaded_apps.form.author_rating"}}</label>
-              <ApkStarRating
-                @rating={{this._editRating}}
-                @interactive={{true}}
-                @onRate={{this.setEditRating}}
-              />
-              {{#if this._editFieldErrors._editRating}}
-                <span
-                  class="sideloaded-form__error"
-                >{{this._editFieldErrors._editRating}}</span>
-              {{/if}}
-            </div>
+            {{#unless this.review.author_is_developer}}
+              <div class="sideloaded-form__field">
+                <label>{{i18n "sideloaded_apps.form.author_rating"}}</label>
+                <ApkStarRating
+                  @rating={{this._editRating}}
+                  @interactive={{true}}
+                  @onRate={{this.setEditRating}}
+                />
+                {{#if this._editFieldErrors._editRating}}
+                  <span
+                    class="sideloaded-form__error"
+                  >{{this._editFieldErrors._editRating}}</span>
+                {{/if}}
+              </div>
+            {{/unless}}
 
             <div
               class="sideloaded-form__field sideloaded-form__field--icon-url"
@@ -980,15 +987,17 @@ export default class ApkReviewDisplay extends Component {
               >{{this.review.apk_version}}</span>
             </div>
 
-            <div class="sideloaded-review-display__info-item">
-              <span class="sideloaded-review-display__label">{{i18n
-                  "sideloaded_apps.rating.author"
-                }}</span>
-              <ApkStarRating
-                @rating={{this.review.author_rating}}
-                @interactive={{false}}
-              />
-            </div>
+            {{#if this.review.author_rating}}
+              <div class="sideloaded-review-display__info-item">
+                <span class="sideloaded-review-display__label">{{i18n
+                    "sideloaded_apps.rating.author"
+                  }}</span>
+                <ApkStarRating
+                  @rating={{this.review.author_rating}}
+                  @interactive={{false}}
+                />
+              </div>
+            {{/if}}
 
             <div class="sideloaded-review-display__info-item">
               <span class="sideloaded-review-display__label">{{i18n

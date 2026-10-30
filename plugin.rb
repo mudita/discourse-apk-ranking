@@ -143,56 +143,61 @@ after_initialize do
       app_category: cf["apk_app_category"] || "other",
       apk_link: cf["apk_link"] || "",
       apk_version: cf["apk_version"] || "",
-      author_rating: (cf["apk_author_rating"] || 0).to_i,
+      author_rating: ApkReview.author_rating_from(cf),
       app_description: cf["apk_description"] || "",
       known_issues: cf["apk_known_issues"] || "",
       apk_checksum: cf["apk_checksum"] || "",
       author_is_developer: cf["apk_author_is_developer"] == "true",
       mmd_dedicated: cf["apk_mmd_dedicated"] == "true",
       icon_url: cf["apk_icon_url"] || "",
-      screenshot_urls: begin
-        JSON.parse(cf["apk_screenshot_urls"] || "[]")
-      rescue JSON::ParserError
-        []
-      end,
+      screenshot_urls:
+        begin
+          JSON.parse(cf["apk_screenshot_urls"] || "[]")
+        rescue JSON::ParserError
+          []
+        end,
     }
   end
 
   # ── Ensure app-category tags + tag group exist ────
   TAG_GROUP_NAME = "Sideloaded App Category"
 
-  ensure_app_category_tags = lambda do
-    return unless SiteSetting.sideloaded_apps_ranking_enabled
+  ensure_app_category_tags =
+    lambda do
+      return unless SiteSetting.sideloaded_apps_ranking_enabled
 
-    tag_group = TagGroup.find_by("LOWER(name) = ?", TAG_GROUP_NAME.downcase) ||
-                TagGroup.create!(name: TAG_GROUP_NAME)
+      tag_group =
+        TagGroup.find_by("LOWER(name) = ?", TAG_GROUP_NAME.downcase) ||
+          TagGroup.create!(name: TAG_GROUP_NAME)
 
-    ApkReview::APP_CATEGORIES.each do |cat_name|
-      tag_name = "app-#{cat_name}"
-      tag = Tag.find_by_name(tag_name) || Tag.create!(name: tag_name)
-      TagGroupMembership.find_or_create_by!(tag: tag, tag_group: tag_group)
-    end
-
-    slug = SiteSetting.sideloaded_apps_category_slug
-    category = Category.find_by(slug: slug)
-    if category && !CategoryTagGroup.exists?(category: category, tag_group: tag_group)
-      CategoryTagGroup.create!(category: category, tag_group: tag_group)
-    end
-
-    # Backfill tags on existing untagged review topics
-    if category
-      guardian = Guardian.new(Discourse.system_user)
-      ApkReview.where(topic_id: Topic.where(category_id: category.id).select(:id)).find_each do |review|
-        topic = review.topic
-        next unless topic
-        tag_name = "app-#{review.app_category}"
-        next if topic.tags.exists?(name: tag_name)
-        DiscourseTagging.tag_topic_by_names(topic, guardian, [tag_name], append: true)
+      ApkReview::APP_CATEGORIES.each do |cat_name|
+        tag_name = "app-#{cat_name}"
+        tag = Tag.find_by_name(tag_name) || Tag.create!(name: tag_name)
+        TagGroupMembership.find_or_create_by!(tag: tag, tag_group: tag_group)
       end
+
+      slug = SiteSetting.sideloaded_apps_category_slug
+      category = Category.find_by(slug: slug)
+      if category && !CategoryTagGroup.exists?(category: category, tag_group: tag_group)
+        CategoryTagGroup.create!(category: category, tag_group: tag_group)
+      end
+
+      # Backfill tags on existing untagged review topics
+      if category
+        guardian = Guardian.new(Discourse.system_user)
+        ApkReview
+          .where(topic_id: Topic.where(category_id: category.id).select(:id))
+          .find_each do |review|
+            topic = review.topic
+            next unless topic
+            tag_name = "app-#{review.app_category}"
+            next if topic.tags.exists?(name: tag_name)
+            DiscourseTagging.tag_topic_by_names(topic, guardian, [tag_name], append: true)
+          end
+      end
+    rescue => e
+      Rails.logger.warn("[Sideloaded Apps] Failed to ensure tags: #{e.message}")
     end
-  rescue => e
-    Rails.logger.warn("[Sideloaded Apps] Failed to ensure tags: #{e.message}")
-  end
 
   ensure_app_category_tags.call
 
@@ -383,7 +388,9 @@ after_initialize do
   end
 
   # ── Topic list ordering ─────────────────────────────
-  register_modifier(:topic_query_apply_ordering_result) do |result, sort_column, sort_dir, options, topic_query|
+  register_modifier(
+    :topic_query_apply_ordering_result,
+  ) do |result, sort_column, sort_dir, options, topic_query|
     category_id = topic_query.options[:category_id]
     category_slug = category_id ? Category.where(id: category_id).pick(:slug) : nil
 
@@ -417,14 +424,16 @@ after_initialize do
       # otherwise a 4.98 shown as "5.0" sorts below a real 5.0 with one vote.
       # Weighted mode starts every app with `confidence` votes at the global
       # average, so a handful of votes cannot outrank a long consistent record.
+      # It is rounded the same way, so when the catalog average sits near 5 a
+      # single 5 does not edge out a 4.95 with many votes on the third decimal.
       # Unrated apps stay last in both modes. Equal ranks go to the app with
       # more votes, bumped_at is the final deterministic tie-break.
       confidence = SiteSetting.sideloaded_apps_ranking_confidence_votes
       rank =
         if confidence > 0
           prior = ApkReview.global_average_rating.to_f
-          "(#{confidence} * #{prior} + community_ratings.community_sum)::float / " \
-            "(#{confidence} + community_ratings.community_count)"
+          "ROUND((#{confidence} * #{prior} + community_ratings.community_sum)::numeric / " \
+            "(#{confidence} + community_ratings.community_count), 1)"
         else
           "community_ratings.community_avg"
         end
@@ -458,7 +467,7 @@ after_initialize do
     app_name = cf["apk_app_name"]
     next if app_name.blank?
 
-    rating = (cf["apk_author_rating"] || 3).to_i.clamp(1, 5)
+    rating = ApkReview.author_rating_from(cf)
 
     app_category = cf["apk_app_category"] || "other"
 
@@ -495,7 +504,12 @@ after_initialize do
     ensure_screenshot_upload_references(topic.id, screenshot_urls)
 
     tag_name = "app-#{app_category}"
-    DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), [tag_name], append: true)
+    DiscourseTagging.tag_topic_by_names(
+      topic,
+      Guardian.new(Discourse.system_user),
+      [tag_name],
+      append: true,
+    )
 
     if apk_link.present?
       probe = ::DiscourseApkRanking::LinkProbe.probe(apk_link, open_timeout: 5, read_timeout: 5)
@@ -504,7 +518,8 @@ after_initialize do
       ApkVerification.create!(
         topic_id: topic.id,
         availability_status: link_available ? "available" : "unavailable",
-        availability_description: link_available ? "Link verified at submission" : "Link was not accessible at submission",
+        availability_description:
+          link_available ? "Link verified at submission" : "Link was not accessible at submission",
         consistency_status: apk_checksum.present? ? "consistent" : "unknown",
         consistency_description:
           apk_checksum.present? ? "Checksum computed at submission" : "No checksum available",
@@ -514,7 +529,9 @@ after_initialize do
       )
     end
   rescue => e
-    Rails.logger.error("[Sideloaded Apps] Failed to create review for topic #{topic.id}: #{e.message}")
+    Rails.logger.error(
+      "[Sideloaded Apps] Failed to create review for topic #{topic.id}: #{e.message}",
+    )
   end
 
   # ── Protect screenshot uploads while a queued review awaits moderation ──
@@ -543,10 +560,7 @@ after_initialize do
         []
       end
 
-    ::DiscourseApkRanking.protect_screenshot_uploads_for(
-      urls: screenshot_urls,
-      target: reviewable,
-    )
+    ::DiscourseApkRanking.protect_screenshot_uploads_for(urls: screenshot_urls, target: reviewable)
   end
 
   # ── Handle topics approved from the review queue ────
@@ -572,7 +586,7 @@ after_initialize do
     topic.save_custom_fields
 
     user = post.user
-    rating = (cf["apk_author_rating"] || 3).to_i.clamp(1, 5)
+    rating = ApkReview.author_rating_from(cf)
     app_category = cf["apk_app_category"] || "other"
     apk_link = cf["apk_link"] || ""
     apk_checksum = cf["apk_checksum"]
@@ -607,7 +621,12 @@ after_initialize do
     ensure_screenshot_upload_references(topic.id, screenshot_urls)
 
     tag_name = "app-#{app_category}"
-    DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), [tag_name], append: true)
+    DiscourseTagging.tag_topic_by_names(
+      topic,
+      Guardian.new(Discourse.system_user),
+      [tag_name],
+      append: true,
+    )
 
     if apk_link.present?
       probe = ::DiscourseApkRanking::LinkProbe.probe(apk_link, open_timeout: 5, read_timeout: 5)
@@ -616,7 +635,8 @@ after_initialize do
       ApkVerification.create!(
         topic_id: topic.id,
         availability_status: link_available ? "available" : "unavailable",
-        availability_description: link_available ? "Link verified at submission" : "Link was not accessible at submission",
+        availability_description:
+          link_available ? "Link verified at submission" : "Link was not accessible at submission",
         consistency_status: apk_checksum.present? ? "consistent" : "unknown",
         consistency_description:
           apk_checksum.present? ? "Checksum computed at submission" : "No checksum available",
@@ -626,7 +646,9 @@ after_initialize do
       )
     end
   rescue => e
-    Rails.logger.error("[Sideloaded Apps] Failed to process approved review for post #{post&.id}: #{e.message}")
+    Rails.logger.error(
+      "[Sideloaded Apps] Failed to process approved review for post #{post&.id}: #{e.message}",
+    )
   end
 
   # ── Helpers for reply auto-prefix (version + rating) ──
@@ -637,10 +659,10 @@ after_initialize do
     is_topic_author = post.topic.user_id == user.id
     effective_rating =
       override_rating ||
-      (!is_topic_author ? ApkReview.user_rating_for(post.topic_id, user.id) : nil)
+        (!is_topic_author ? ApkReview.user_rating_for(post.topic_id, user.id) : nil)
 
     lines = ["> #{I18n.t("js.sideloaded_apps.reply_version_prefix")} #{review.apk_version}"]
-    if is_topic_author
+    if is_topic_author && review.author_rating
       author_stars = "\u2605" * review.author_rating + "\u2606" * (5 - review.author_rating)
       lines << "> #{I18n.t("js.sideloaded_apps.reply_author_rating_prefix")} #{author_stars} · #{I18n.t("js.sideloaded_apps.reply_author_badge")}"
     elsif effective_rating&.between?(1, 5)
@@ -678,11 +700,12 @@ after_initialize do
     author_key = apk_normalize_quotes(I18n.t("js.sideloaded_apps.reply_author_rating_prefix"))
     prefix_keys = [version_key, user_key, author_key, "Review for version"].uniq
 
-    kept = cleaned.lines.reject do |line|
-      stripped = apk_normalize_quotes(line.strip.sub(/\A>+\s*/, ""))
-      next false if stripped.empty?
-      prefix_keys.any? { |k| stripped.include?(k) }
-    end
+    kept =
+      cleaned.lines.reject do |line|
+        stripped = apk_normalize_quotes(line.strip.sub(/\A>+\s*/, ""))
+        next false if stripped.empty?
+        prefix_keys.any? { |k| stripped.include?(k) }
+      end
 
     # Drop leading blank lines and collapse any run of 3+ consecutive
     # newlines (left where a prefix block was removed) into 2.
@@ -693,12 +716,10 @@ after_initialize do
   # user-added content outside the markers survives and is returned.
   def self.apk_strip_audit_block(raw)
     return raw if raw.blank?
-    raw
-      .gsub(
-        /#{Regexp.escape(::DiscourseApkRanking::AUDIT_START)}.*?#{Regexp.escape(::DiscourseApkRanking::AUDIT_END)}\s*/m,
-        "",
-      )
-      .sub(/\A\s+/, "")
+    raw.gsub(
+      /#{Regexp.escape(::DiscourseApkRanking::AUDIT_START)}.*?#{Regexp.escape(::DiscourseApkRanking::AUDIT_END)}\s*/m,
+      "",
+    ).sub(/\A\s+/, "")
   end
 
   # ── Persist reply star rating + auto-prefix ──────────
@@ -722,11 +743,16 @@ after_initialize do
       PluginStore.set("sideloaded_ratings", "t#{post.topic_id}_u#{user.id}", rating)
       post.custom_fields["apk_rating"] = rating
       post.save_custom_fields
-      Rails.logger.info("[Sideloaded Apps] Saved/updated rating #{rating} for user #{user.id} on post #{post.id} in topic #{post.topic_id}")
+      Rails.logger.info(
+        "[Sideloaded Apps] Saved/updated rating #{rating} for user #{user.id} on post #{post.id} in topic #{post.topic_id}",
+      )
     end
 
     # Auto-prefix with version (skip for audit posts from review edits)
-    next if post.raw.include?(::DiscourseApkRanking::AUDIT_START) || post.raw.include?("Review updated by")
+    if post.raw.include?(::DiscourseApkRanking::AUDIT_START) ||
+         post.raw.include?("Review updated by")
+      next
+    end
 
     prefix = apk_reply_prefix_for(post, user, override_rating: rating)
     next unless prefix
@@ -775,6 +801,8 @@ after_initialize do
       post.rebake!
     end
   rescue => e
-    Rails.logger.error("[Sideloaded Apps] Failed to re-apply prefix on edited post #{post&.id}: #{e.message}")
+    Rails.logger.error(
+      "[Sideloaded Apps] Failed to re-apply prefix on edited post #{post&.id}: #{e.message}",
+    )
   end
 end

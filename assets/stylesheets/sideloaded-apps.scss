@@ -1032,7 +1032,6 @@ body.sideloaded-apps-category .topic-list {
   }
 
   .sideloaded-col {
-    box-sizing: border-box;
     padding-left: 0;
     padding-right: 0;
     text-align: center;
@@ -1051,22 +1050,42 @@ body.sideloaded-apps-category .topic-list {
     width: 40px;
   }
 
-  .posters,
-  .sideloaded-rating-column,
-  .replies,
-  .posts,
-  .activity {
+  th,
+  td {
     box-sizing: border-box;
   }
 
-  .posters {
+  // The theme makes this cell a flexbox, which drops it out of the table row
+  // and pins the avatars to the top of the row.
+  th.posters {
     width: 120px;
-    vertical-align: middle;
   }
 
-  .sideloaded-rating-column {
+  td.posters {
+    display: table-cell;
+    width: 120px;
+    vertical-align: middle;
+    font-size: 0;
+
+    a {
+      display: inline-block;
+      vertical-align: middle;
+    }
+  }
+
+  .sideloaded-rating-column,
+  th.community_rating {
     width: 100px;
     min-width: 0;
+  }
+
+  th.community_rating {
+    white-space: normal;
+  }
+
+  td.sideloaded-rating-column {
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .replies,
@@ -1076,6 +1095,7 @@ body.sideloaded-apps-category .topic-list {
 
   .activity {
     width: 80px;
+    padding-right: 4px;
   }
 
   .main-link .title {
@@ -1093,6 +1113,10 @@ body.sideloaded-apps-category .topic-list {
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .sideloaded-col .sideloaded-topic-list-icon {
+    box-sizing: border-box;
   }
 
   .sideloaded-col .sideloaded-topic-list-icon-link,

@@ -20,7 +20,8 @@ class ::ApkReview < ActiveRecord::Base
               with: URI::DEFAULT_PARSER.make_regexp(%w[http https]),
             }
   validates :apk_version, presence: true, length: { maximum: 50 }
-  validates :author_rating, presence: true, inclusion: { in: 1..5 }
+  validates :author_rating, inclusion: { in: 1..5 }, unless: :author_is_developer?
+  validates :author_rating, absence: true, if: :author_is_developer?
   validates :app_description, presence: true
 
   APP_CATEGORIES = %w[
@@ -42,6 +43,16 @@ class ::ApkReview < ActiveRecord::Base
 
   def self.app_categories
     APP_CATEGORIES
+  end
+
+  # A developer reviewing their own app does not rate it; anyone else must.
+  def self.author_rating_from(custom_fields)
+    return nil if custom_fields["apk_author_is_developer"] == "true"
+    (custom_fields["apk_author_rating"].presence || 3).to_i.clamp(1, 5)
+  end
+
+  def author_is_developer?
+    topic&.custom_fields&.dig("apk_author_is_developer") == "true"
   end
 
   # Single source for community ratings: the topic list, the sort order and

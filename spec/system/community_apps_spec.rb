@@ -97,6 +97,11 @@ describe "Community Apps", type: :system do
         sideloaded-col--dev
       ],
     )
+    pill_size =
+      page.evaluate_script(
+        "(() => { const b = document.querySelector(\"#{row(dev_app)} .sideloaded-app-category-badge\").getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()",
+      )
+    expect(pill_size).to eq([130, 25])
     expect(page).to have_css("#{row(dev_app)} td.sideloaded-col--mmd .sideloaded-mmd-badge")
     expect(page).to have_css("#{row(dev_app)} td.sideloaded-col--dev .sideloaded-dev-badge")
     expect(page).to have_css("#{row(plain)} td.sideloaded-col--dev")
@@ -116,6 +121,35 @@ describe "Community Apps", type: :system do
     expect(page).to have_css("#{row(fresh)} .sideloaded-updated-badge", text: "Updated")
     expect(page).to have_css(row(stale))
     expect(page).to have_no_css("#{row(stale)} .sideloaded-updated-badge")
+  end
+
+  it "asks the developer for no rating in the submission form" do
+    sign_in(user)
+
+    visit("/c/#{category.slug}/#{category.id}")
+    find("#create-topic").click
+
+    expect(page).to have_css(".sideloaded-composer-fields .sideloaded-star-rating")
+
+    find(".sideloaded-form__field--checkbox label", text: "I am the developer").click
+
+    expect(page).to have_css(".sideloaded-form__help--developer")
+    expect(page).to have_no_css(".sideloaded-composer-fields .sideloaded-star-rating")
+  end
+
+  it "shows no author rating on a developer's review" do
+    dev_app = app_topic("Dev App")
+    dev_app.custom_fields["apk_author_is_developer"] = "true"
+    dev_app.save_custom_fields
+    ApkReview.find_by(topic_id: dev_app.id).update_column(:author_rating, nil)
+    other_app = app_topic("Other App")
+
+    visit(other_app.relative_url)
+    expect(page).to have_css(".sideloaded-review-display", text: /author's rating/i)
+
+    visit(dev_app.relative_url)
+    expect(page).to have_css(".sideloaded-review-display")
+    expect(page).to have_no_content(/author's rating/i)
   end
 
   it "offers Tools in the app submission form" do

@@ -880,14 +880,16 @@ export default apiInitializer((api) => {
               >{{this.data.apk_link}}</a>
             </div>
 
-            <div class="sideloaded-reviewable-preview__item">
-              <span class="sideloaded-reviewable-preview__label">{{i18n
-                  "sideloaded_apps.form.author_rating"
-                }}</span>
-              <span
-                class="sideloaded-reviewable-preview__stars"
-              >{{this.stars}}</span>
-            </div>
+            {{#if this.data.author_rating}}
+              <div class="sideloaded-reviewable-preview__item">
+                <span class="sideloaded-reviewable-preview__label">{{i18n
+                    "sideloaded_apps.form.author_rating"
+                  }}</span>
+                <span
+                  class="sideloaded-reviewable-preview__stars"
+                >{{this.stars}}</span>
+              </div>
+            {{/if}}
 
             {{#if this.data.apk_checksum}}
               <div class="sideloaded-reviewable-preview__item">
