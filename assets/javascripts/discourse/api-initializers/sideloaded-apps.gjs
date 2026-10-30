@@ -691,73 +691,63 @@ export default apiInitializer((api) => {
     return columns;
   });
 
-  // ── 8. TOPIC LIST (mobile): Category -> Logo -> Dev badge (before link) ──
-  // Desktop renders these as separate columns (see the transformer above).
+  // ── 8. TOPIC LIST (mobile): app icon instead of the avatar, badges under
+  // the title. Desktop renders these as columns (see the transformer above).
   api.renderInOutlet(
-    "topic-list-before-link",
-    class SideloadedAppListBadge extends Component {
+    "topic-list-item-mobile-avatar",
+    class SideloadedMobileAppIcon extends Component {
+      static shouldRender(args) {
+        return !!args.topic?.apk_app_name && !!args.topic?.apk_icon_url;
+      }
+
+      <template>
+        <a
+          href={{@outletArgs.topic.url}}
+          class="sideloaded-topic-list-icon-link"
+          data-topic-id={{@outletArgs.topic.id}}
+        >
+          <img
+            src={{@outletArgs.topic.apk_icon_url}}
+            alt=""
+            class="sideloaded-topic-list-icon"
+          />
+        </a>
+      </template>
+    }
+  );
+
+  // Fixed slots, empty ones included, keep MMD and DEV in the same place on
+  // every row. The second slot is reserved for the InkApps badge.
+  api.renderInOutlet(
+    "topic-list-main-link-bottom",
+    class SideloadedMobileAppBadges extends Component {
       static shouldRender(args, _context, owner) {
         return (
           !!args.topic?.apk_app_name && owner.lookup("service:site").mobileView
         );
       }
 
-      get topic() {
-        return this.args.outletArgs?.topic;
-      }
-
-      get topicUrl() {
-        return this.topic?.url;
-      }
-
-      get appCategory() {
-        const cat = this.topic?.apk_app_category;
-        if (!cat) {
-          return null;
-        }
-        return i18n(`sideloaded_apps.categories.${cat}`);
-      }
-
-      get iconUrl() {
-        return this.topic?.apk_icon_url;
-      }
-
-      get isDeveloper() {
-        return !!this.topic?.apk_author_is_developer;
-      }
-
-      get isMmd() {
-        return !!this.topic?.apk_mmd_dedicated;
-      }
-
       <template>
-        {{! Order: category app -> logo -> dev badge (topic name from core, then rating in after-title) }}
-        {{#if this.appCategory}}
-          <span class="sideloaded-app-category-badge">
-            {{this.appCategory}}
+        <div class="sideloaded-mobile-badges">
+          {{#if (appCategoryLabel @outletArgs.topic)}}
+            <span class="sideloaded-app-category-badge">
+              {{appCategoryLabel @outletArgs.topic}}
+            </span>
+          {{/if}}
+          <span class="sideloaded-mobile-badges__slot --inkapps"></span>
+          <span class="sideloaded-mobile-badges__slot --mmd">
+            {{#if @outletArgs.topic.apk_mmd_dedicated}}
+              <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
+            {{/if}}
           </span>
-        {{/if}}
-        {{#if this.isMmd}}
-          <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
-        {{/if}}
-        {{#if this.isDeveloper}}
-          <span class="sideloaded-dev-badge">{{i18n
-              "sideloaded_apps.dev_badge"
-            }}</span>
-        {{/if}}
-        {{#if this.iconUrl}}
-          <a
-            href={{this.topicUrl}}
-            class="sideloaded-topic-list-icon-link"
-            data-topic-id={{this.topic.id}}
-          >
-            <img
-              src={{this.iconUrl}}
-              alt=""
-              class="sideloaded-topic-list-icon"
-            />
-          </a>
-        {{/if}}
+          <span class="sideloaded-mobile-badges__slot --dev">
+            {{#if @outletArgs.topic.apk_author_is_developer}}
+              <span class="sideloaded-dev-badge">{{i18n
+                  "sideloaded_apps.dev_badge"
+                }}</span>
+            {{/if}}
+          </span>
+        </div>
       </template>
     }
   );

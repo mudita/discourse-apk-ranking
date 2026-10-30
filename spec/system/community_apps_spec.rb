@@ -109,19 +109,54 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_css("#{row(plain)} .main-link .sideloaded-app-category-badge")
   end
 
-  it "keeps the 130x25 category pill next to the title on mobile", mobile: true do
+  it "lays a mobile row out as icon, title, then the badge row", mobile: true do
     app = app_topic("Mobile App", app_category: "tools")
+    app.custom_fields["apk_icon_url"] = "/images/discourse-logo-sketch-small.png"
+    app.custom_fields["apk_mmd_dedicated"] = "true"
+    app.custom_fields["apk_author_is_developer"] = "true"
+    app.save_custom_fields
+    no_icon = app_topic("No Icon App")
 
     visit("/c/#{category.slug}/#{category.id}")
 
-    pill = "#{row(app)} .sideloaded-app-category-badge"
+    pill = "#{row(app)} .main-link .sideloaded-mobile-badges .sideloaded-app-category-badge"
     expect(page).to have_css(pill, text: "Tools")
     size =
       page.evaluate_script(
         "(() => { const b = document.querySelector(#{pill.to_json}).getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()",
       )
     expect(size).to eq([130, 25])
-    expect(page).to have_no_css("#{row(app)} td.sideloaded-col--category")
+
+    slots = all("#{row(app)} .sideloaded-mobile-badges > *").map { |el| el[:class] }
+    expect(slots).to eq(
+      [
+        "sideloaded-app-category-badge",
+        "sideloaded-mobile-badges__slot --inkapps",
+        "sideloaded-mobile-badges__slot --mmd",
+        "sideloaded-mobile-badges__slot --dev",
+      ],
+    )
+    expect(page).to have_css("#{row(app)} .--mmd .sideloaded-mmd-badge")
+    expect(page).to have_css("#{row(app)} .--dev .sideloaded-dev-badge")
+
+    geometry = page.evaluate_script(<<~JS)
+        (() => {
+          const row = document.querySelector(#{row(app).to_json});
+          const box = (sel) => row.querySelector(sel).getBoundingClientRect();
+          const middle = (r) => Math.round(r.top + r.height / 2);
+          return {
+            icon_vs_count: Math.abs(middle(box(".pull-left")) - middle(box(".pull-right"))),
+            pill_vs_dev: Math.abs(middle(box(".sideloaded-app-category-badge")) - middle(box(".sideloaded-dev-badge"))),
+          };
+        })()
+      JS
+    expect(geometry["icon_vs_count"]).to be <= 2
+    expect(geometry["pill_vs_dev"]).to be <= 2
+
+    expect(page).to have_css("#{row(app)} .pull-left img.sideloaded-topic-list-icon")
+    expect(page).to have_no_css("#{row(app)} .pull-left img.avatar")
+    expect(page).to have_css("#{row(no_icon)} .pull-left img.avatar")
+    expect(page).to have_no_css("#{row(no_icon)} .sideloaded-dev-badge")
   end
 
   it "labels recently updated apps until the label window passes" do
