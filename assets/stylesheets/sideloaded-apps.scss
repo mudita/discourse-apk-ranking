@@ -1016,6 +1016,97 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   min-width: 80px;
 }
 
+// Desktop listing grid. The title column takes what is left, 590px at the
+// 1260px layout width.
+body.sideloaded-apps-category .topic-list {
+  // The theme hides the forum category column by position (nth-child(2)) on
+  // category pages, which hits the app icon once the columns shift.
+  th.sideloaded-col--icon,
+  td.sideloaded-col--icon {
+    display: table-cell !important;
+  }
+
+  th.category,
+  td.category {
+    display: none !important;
+  }
+
+  .sideloaded-col {
+    box-sizing: border-box;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .sideloaded-col--category {
+    width: 150px;
+    text-align: left;
+  }
+
+  .sideloaded-col--icon,
+  .sideloaded-col--inkapps,
+  .sideloaded-col--mmd,
+  .sideloaded-col--dev {
+    width: 40px;
+  }
+
+  .posters,
+  .sideloaded-rating-column,
+  .replies,
+  .posts,
+  .activity {
+    box-sizing: border-box;
+  }
+
+  .posters {
+    width: 120px;
+    vertical-align: middle;
+  }
+
+  .sideloaded-rating-column {
+    width: 100px;
+    min-width: 0;
+  }
+
+  .replies,
+  .posts {
+    width: 60px;
+  }
+
+  .activity {
+    width: 80px;
+  }
+
+  .main-link .title {
+    overflow-wrap: anywhere;
+  }
+
+  .sideloaded-col .sideloaded-app-category-badge {
+    box-sizing: border-box;
+    width: 130px;
+    height: 25px;
+    margin: 0;
+    padding: 0 8px;
+    border-radius: 4px;
+    line-height: 25px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sideloaded-col .sideloaded-topic-list-icon-link,
+  .sideloaded-col .sideloaded-topic-list-icon,
+  .sideloaded-col .sideloaded-topic-list-mmd-badge,
+  .sideloaded-col .sideloaded-dev-badge {
+    margin: 0;
+  }
+
+  .sideloaded-col .sideloaded-mmd-badge {
+    padding: 4px;
+  }
+}
+
 .sideloaded-topic-rating {
   display: inline-flex;
   align-items: center;

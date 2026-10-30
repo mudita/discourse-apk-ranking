@@ -578,11 +578,74 @@ export default apiInitializer((api) => {
     return parseFloat(value).toFixed(1);
   }
 
-  api.registerValueTransformer("topic-list-columns", ({ value: columns }) => {
-    const router = api.container.lookup("service:router");
-    const currentURL = router.currentURL;
+  function appCategoryLabel(topic) {
+    const category = topic?.apk_app_name && topic.apk_app_category;
+    return category ? i18n(`sideloaded_apps.categories.${category}`) : null;
+  }
 
-    if (!currentURL?.includes(`/c/${categorySlug}`)) {
+  const emptyHeader = (name) => <template>
+    <th class="topic-list-data sideloaded-col sideloaded-col--{{name}}"></th>
+  </template>;
+
+  const AppCategoryItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--category">
+      {{#if (appCategoryLabel @topic)}}
+        <span class="sideloaded-app-category-badge">
+          {{appCategoryLabel @topic}}
+        </span>
+      {{/if}}
+    </td>
+  </template>;
+
+  const AppIconItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--icon">
+      {{#if @topic.apk_icon_url}}
+        <a
+          href={{@topic.url}}
+          class="sideloaded-topic-list-icon-link"
+          data-topic-id={{@topic.id}}
+        >
+          <img
+            src={{@topic.apk_icon_url}}
+            alt=""
+            class="sideloaded-topic-list-icon"
+          />
+        </a>
+      {{/if}}
+    </td>
+  </template>;
+
+  // Kept empty on purpose: the design reserves this slot for the InkApps
+  // availability badge, so the other columns do not shift when it lands.
+  const InkAppsItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--inkapps"></td>
+  </template>;
+
+  const MmdItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--mmd">
+      {{#if @topic.apk_mmd_dedicated}}
+        <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
+      {{/if}}
+    </td>
+  </template>;
+
+  const DevItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--dev">
+      {{#if @topic.apk_author_is_developer}}
+        <span class="sideloaded-dev-badge">{{i18n
+            "sideloaded_apps.dev_badge"
+          }}</span>
+      {{/if}}
+    </td>
+  </template>;
+
+  function isAppsListing() {
+    const router = api.container.lookup("service:router");
+    return !!router.currentURL?.includes(`/c/${categorySlug}`);
+  }
+
+  api.registerValueTransformer("topic-list-columns", ({ value: columns }) => {
+    if (!isAppsListing()) {
       return columns;
     }
 
@@ -592,18 +655,51 @@ export default apiInitializer((api) => {
         header: CommunityRatingHeader,
         item: CommunityRatingItem,
       },
-      { after: "posters" }
+      { after: "posters", before: "replies" }
+    );
+
+    if (api.container.lookup("service:site").mobileView) {
+      return columns;
+    }
+
+    columns.add(
+      "apk-category",
+      { header: emptyHeader("category"), item: AppCategoryItem },
+      { before: "topic" }
+    );
+    columns.add(
+      "apk-icon",
+      { header: emptyHeader("icon"), item: AppIconItem },
+      { after: "apk-category", before: "topic" }
+    );
+    columns.add(
+      "apk-inkapps",
+      { header: emptyHeader("inkapps"), item: InkAppsItem },
+      { after: "topic" }
+    );
+    columns.add(
+      "apk-mmd",
+      { header: emptyHeader("mmd"), item: MmdItem },
+      { after: "apk-inkapps" }
+    );
+    columns.add(
+      "apk-dev",
+      { header: emptyHeader("dev"), item: DevItem },
+      { after: "apk-mmd", before: "posters" }
     );
 
     return columns;
   });
 
-  // ── 8. TOPIC LIST: Category -> Logo -> Dev badge (before link) ──────────
+  // ── 8. TOPIC LIST (mobile): Category -> Logo -> Dev badge (before link) ──
+  // Desktop renders these as separate columns (see the transformer above).
   api.renderInOutlet(
     "topic-list-before-link",
     class SideloadedAppListBadge extends Component {
-      static shouldRender(args) {
-        return !!args.topic?.apk_app_name;
+      static shouldRender(args, _context, owner) {
+        return (
+          !!args.topic?.apk_app_name && owner.lookup("service:site").mobileView
+        );
       }
 
       get topic() {

@@ -76,6 +76,34 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_css(row(calculator))
   end
 
+  it "gives every app badge its own column so rows line up" do
+    dev_app = app_topic("Dev App", app_category: "tools")
+    dev_app.custom_fields["apk_author_is_developer"] = "true"
+    dev_app.custom_fields["apk_mmd_dedicated"] = "true"
+    dev_app.save_custom_fields
+    plain = app_topic("Plain App")
+
+    visit("/c/#{category.slug}/#{category.id}")
+
+    expect(page).to have_css("#{row(dev_app)} td.sideloaded-col--category", text: "Tools")
+    columns = all("#{row(dev_app)} td").map { |td| td[:class][/sideloaded-col--\w+|main-link/] }
+    expect(columns.compact.first(6)).to eq(
+      %w[
+        sideloaded-col--category
+        sideloaded-col--icon
+        main-link
+        sideloaded-col--inkapps
+        sideloaded-col--mmd
+        sideloaded-col--dev
+      ],
+    )
+    expect(page).to have_css("#{row(dev_app)} td.sideloaded-col--mmd .sideloaded-mmd-badge")
+    expect(page).to have_css("#{row(dev_app)} td.sideloaded-col--dev .sideloaded-dev-badge")
+    expect(page).to have_css("#{row(plain)} td.sideloaded-col--dev")
+    expect(page).to have_no_css("#{row(plain)} .sideloaded-dev-badge")
+    expect(page).to have_no_css("#{row(plain)} .main-link .sideloaded-app-category-badge")
+  end
+
   it "labels recently updated apps until the label window passes" do
     SiteSetting.sideloaded_apps_updated_badge_days = 14
     fresh = app_topic("Fresh Release")
