@@ -43,6 +43,7 @@ en:
         author_rating: "Your rating for the App"
         author_rating_help: "Rate this app 1-5 stars based on usability on Kompakt"
         author_is_developer: "I am the developer of this app"
+        developer_no_rating: "As the developer you don't rate your own app. Its rating comes from other members."
         mmd_dedicated: "This app is dedicated for Mudita Kompakt (MMD)"
         icon_url: "App icon URL (optional)"
         icon_url_placeholder: "https://..."
@@ -82,6 +83,7 @@ en:
         social: "Social"
         productivity: "Productivity"
         utilities: "Utilities"
+        tools: "Tools"
         health: "Health & Fitness"
         finance: "Finance"
         entertainment: "Logic Games"
@@ -102,6 +104,7 @@ en:
         author: "Author's Rating"
         community: "Community Rating"
         no_ratings: "No ratings yet"
+        plain_average: "Average %{average} from %{count} ratings. The ranking also counts how many people rated."
 
       stars:
         label: "Rating"
@@ -172,6 +175,8 @@ en:
 
       dev_badge: "DEV"
       dev_badge_title: "Review author is the app developer"
+      updated_badge: "Updated %{date}"
+      updated_badge_title: "A new version or file was published on %{date}"
       mmd_badge: "MMD"
       mmd_badge_title: "Dedicated for Mudita Kompakt"
       report_outdated: "Report outdated version"

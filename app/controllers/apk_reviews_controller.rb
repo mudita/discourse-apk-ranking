@@ -56,6 +56,7 @@ class ::ApkReviewsController < ::ApplicationController
     review.topic_id = topic.id
     review.user_id = current_user.id
     review.last_access_date = Time.current
+    review.author_rating = nil if review.author_is_developer?
 
     if review.save
       render json: { review: ApkReviewSerializer.new(review, root: false).as_json }, status: 201
@@ -83,7 +84,13 @@ class ::ApkReviewsController < ::ApplicationController
     icon_url_param = params.dig(:review, :icon_url)
     mmd_dedicated_param = params.dig(:review, :mmd_dedicated)
 
-    if review.update(review_params)
+    attrs = review_params
+    attrs = attrs.except(:author_rating) if review.author_is_developer?
+
+    if review.update(attrs)
+      if review.saved_change_to_apk_version? || review.saved_change_to_apk_checksum?
+        review.update_column(:version_updated_at, Time.current)
+      end
       update_topic_icon_url(review.topic, icon_url_param)
       update_topic_mmd_dedicated(review.topic, mmd_dedicated_param)
       create_edit_audit_post(review, old_attrs)
@@ -534,6 +541,7 @@ class ::ApkReviewsController < ::ApplicationController
         topic_id: review.topic_id,
         raw: raw,
         skip_validations: true,
+        no_bump: true,
       )
 
     post.custom_fields["apk_audit_raw"] = canonical

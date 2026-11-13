@@ -6,6 +6,7 @@ import { action } from "@ember/object";
 import SortableColumn from "discourse/components/topic-list/header/sortable-column";
 import { ajax } from "discourse/lib/ajax";
 import { apiInitializer } from "discourse/lib/api";
+import { shortDate } from "discourse/lib/formatter";
 import { i18n } from "discourse-i18n";
 import ApkComposerFields, {
   clearPendingApkData,
@@ -95,6 +96,7 @@ export default apiInitializer((api) => {
     "communication",
     "productivity",
     "utilities",
+    "tools",
     "health",
     "finance",
     "entertainment",
@@ -559,7 +561,14 @@ export default apiInitializer((api) => {
   const CommunityRatingItem = <template>
     <td class="num sideloaded-rating-column topic-list-data">
       {{#if @topic.apk_community_count}}
-        <span class="sideloaded-community-stars">
+        <span
+          class="sideloaded-community-stars"
+          title={{i18n
+            "sideloaded_apps.rating.plain_average"
+            average=(formatRating @topic.apk_community_plain_average)
+            count=@topic.apk_community_count
+          }}
+        >
           ★
           {{formatRating @topic.apk_community_average}}
         </span>
@@ -576,11 +585,74 @@ export default apiInitializer((api) => {
     return parseFloat(value).toFixed(1);
   }
 
-  api.registerValueTransformer("topic-list-columns", ({ value: columns }) => {
-    const router = api.container.lookup("service:router");
-    const currentURL = router.currentURL;
+  function appCategoryLabel(topic) {
+    const category = topic?.apk_app_name && topic.apk_app_category;
+    return category ? i18n(`sideloaded_apps.categories.${category}`) : null;
+  }
 
-    if (!currentURL?.includes(`/c/${categorySlug}`)) {
+  const emptyHeader = (name) => <template>
+    <th class="topic-list-data sideloaded-col sideloaded-col--{{name}}"></th>
+  </template>;
+
+  const AppCategoryItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--category">
+      {{#if (appCategoryLabel @topic)}}
+        <span class="sideloaded-app-category-badge">
+          {{appCategoryLabel @topic}}
+        </span>
+      {{/if}}
+    </td>
+  </template>;
+
+  const AppIconItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--icon">
+      {{#if @topic.apk_icon_url}}
+        <a
+          href={{@topic.url}}
+          class="sideloaded-topic-list-icon-link"
+          data-topic-id={{@topic.id}}
+        >
+          <img
+            src={{@topic.apk_icon_url}}
+            alt=""
+            class="sideloaded-topic-list-icon"
+          />
+        </a>
+      {{/if}}
+    </td>
+  </template>;
+
+  // Kept empty on purpose: the design reserves this slot for the InkApps
+  // availability badge, so the other columns do not shift when it lands.
+  const InkAppsItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--inkapps"></td>
+  </template>;
+
+  const MmdItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--mmd">
+      {{#if @topic.apk_mmd_dedicated}}
+        <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
+      {{/if}}
+    </td>
+  </template>;
+
+  const DevItem = <template>
+    <td class="topic-list-data sideloaded-col sideloaded-col--dev">
+      {{#if @topic.apk_author_is_developer}}
+        <span class="sideloaded-dev-badge">{{i18n
+            "sideloaded_apps.dev_badge"
+          }}</span>
+      {{/if}}
+    </td>
+  </template>;
+
+  function isAppsListing() {
+    const router = api.container.lookup("service:router");
+    return !!router.currentURL?.includes(`/c/${categorySlug}`);
+  }
+
+  api.registerValueTransformer("topic-list-columns", ({ value: columns }) => {
+    if (!isAppsListing()) {
       return columns;
     }
 
@@ -590,76 +662,125 @@ export default apiInitializer((api) => {
         header: CommunityRatingHeader,
         item: CommunityRatingItem,
       },
-      { after: "posters" }
+      { after: "posters", before: "replies" }
+    );
+
+    if (api.container.lookup("service:site").mobileView) {
+      return columns;
+    }
+
+    columns.add(
+      "apk-category",
+      { header: emptyHeader("category"), item: AppCategoryItem },
+      { before: "topic" }
+    );
+    columns.add(
+      "apk-icon",
+      { header: emptyHeader("icon"), item: AppIconItem },
+      { after: "apk-category", before: "topic" }
+    );
+    columns.add(
+      "apk-inkapps",
+      { header: emptyHeader("inkapps"), item: InkAppsItem },
+      { after: "topic" }
+    );
+    columns.add(
+      "apk-mmd",
+      { header: emptyHeader("mmd"), item: MmdItem },
+      { after: "apk-inkapps" }
+    );
+    columns.add(
+      "apk-dev",
+      { header: emptyHeader("dev"), item: DevItem },
+      { after: "apk-mmd", before: "posters" }
     );
 
     return columns;
   });
 
-  // ── 8. TOPIC LIST: Category -> Logo -> Dev badge (before link) ──────────
+  // ── 8. TOPIC LIST (mobile): app icon instead of the avatar (blank when the
+  // app has none), badges under the title. Desktop renders these as columns
+  // (see the transformer above).
   api.renderInOutlet(
-    "topic-list-before-link",
-    class SideloadedAppListBadge extends Component {
+    "topic-list-item-mobile-avatar",
+    class SideloadedMobileAppIcon extends Component {
       static shouldRender(args) {
         return !!args.topic?.apk_app_name;
       }
 
-      get topic() {
-        return this.args.outletArgs?.topic;
-      }
-
-      get topicUrl() {
-        return this.topic?.url;
-      }
-
-      get appCategory() {
-        const cat = this.topic?.apk_app_category;
-        if (!cat) {
-          return null;
-        }
-        return i18n(`sideloaded_apps.categories.${cat}`);
-      }
-
-      get iconUrl() {
-        return this.topic?.apk_icon_url;
-      }
-
-      get isDeveloper() {
-        return !!this.topic?.apk_author_is_developer;
-      }
-
-      get isMmd() {
-        return !!this.topic?.apk_mmd_dedicated;
-      }
-
       <template>
-        {{! Order: category app -> logo -> dev badge (topic name from core, then rating in after-title) }}
-        {{#if this.appCategory}}
-          <span class="sideloaded-app-category-badge">
-            {{this.appCategory}}
-          </span>
-        {{/if}}
-        {{#if this.isMmd}}
-          <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
-        {{/if}}
-        {{#if this.isDeveloper}}
-          <span class="sideloaded-dev-badge">{{i18n
-              "sideloaded_apps.dev_badge"
-            }}</span>
-        {{/if}}
-        {{#if this.iconUrl}}
+        {{#if @outletArgs.topic.apk_icon_url}}
           <a
-            href={{this.topicUrl}}
+            href={{@outletArgs.topic.url}}
             class="sideloaded-topic-list-icon-link"
-            data-topic-id={{this.topic.id}}
+            data-topic-id={{@outletArgs.topic.id}}
           >
             <img
-              src={{this.iconUrl}}
+              src={{@outletArgs.topic.apk_icon_url}}
               alt=""
               class="sideloaded-topic-list-icon"
             />
           </a>
+        {{else}}
+          <span class="sideloaded-topic-list-icon-blank"></span>
         {{/if}}
+      </template>
+    }
+  );
+
+  api.renderInOutlet(
+    "topic-list-main-link-bottom",
+    class SideloadedMobileAppBadges extends Component {
+      static shouldRender(args, _context, owner) {
+        return (
+          !!args.topic?.apk_app_name && owner.lookup("service:site").mobileView
+        );
+      }
+
+      <template>
+        <div class="sideloaded-mobile-badges">
+          {{#if (appCategoryLabel @outletArgs.topic)}}
+            <span class="sideloaded-app-category-badge">
+              {{appCategoryLabel @outletArgs.topic}}
+            </span>
+          {{/if}}
+          {{#if @outletArgs.topic.apk_mmd_dedicated}}
+            <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
+          {{/if}}
+          {{#if @outletArgs.topic.apk_author_is_developer}}
+            <span class="sideloaded-dev-badge">{{i18n
+                "sideloaded_apps.dev_badge"
+              }}</span>
+          {{/if}}
+        </div>
+      </template>
+    }
+  );
+
+  // ── 8b. TOPIC LIST: "Updated" label after the title ──
+  // Version and checksum updates no longer bump the topic, so this label is
+  // how people without GitHub or Obtainium notice a new release.
+  api.renderInOutlet(
+    "topic-list-after-title",
+    class SideloadedUpdatedBadge extends Component {
+      static shouldRender(args) {
+        const days = siteSettings.sideloaded_apps_updated_badge_days;
+        const updatedAt = args.topic?.apk_version_updated_at;
+        if (!days || !updatedAt) {
+          return false;
+        }
+        return Date.now() - new Date(updatedAt).getTime() < days * 86_400_000;
+      }
+
+      get date() {
+        return shortDate(this.args.outletArgs.topic.apk_version_updated_at);
+      }
+
+      <template>
+        <span
+          class="sideloaded-updated-badge"
+          title={{i18n "sideloaded_apps.updated_badge_title" date=this.date}}
+        >{{i18n "sideloaded_apps.updated_badge" date=this.date}}</span>
       </template>
     }
   );
@@ -754,14 +875,16 @@ export default apiInitializer((api) => {
               >{{this.data.apk_link}}</a>
             </div>
 
-            <div class="sideloaded-reviewable-preview__item">
-              <span class="sideloaded-reviewable-preview__label">{{i18n
-                  "sideloaded_apps.form.author_rating"
-                }}</span>
-              <span
-                class="sideloaded-reviewable-preview__stars"
-              >{{this.stars}}</span>
-            </div>
+            {{#if this.data.author_rating}}
+              <div class="sideloaded-reviewable-preview__item">
+                <span class="sideloaded-reviewable-preview__label">{{i18n
+                    "sideloaded_apps.form.author_rating"
+                  }}</span>
+                <span
+                  class="sideloaded-reviewable-preview__stars"
+                >{{this.stars}}</span>
+              </div>
+            {{/if}}
 
             {{#if this.data.apk_checksum}}
               <div class="sideloaded-reviewable-preview__item">
