@@ -561,7 +561,14 @@ export default apiInitializer((api) => {
   const CommunityRatingItem = <template>
     <td class="num sideloaded-rating-column topic-list-data">
       {{#if @topic.apk_community_count}}
-        <span class="sideloaded-community-stars">
+        <span
+          class="sideloaded-community-stars"
+          title={{i18n
+            "sideloaded_apps.rating.plain_average"
+            average=(formatRating @topic.apk_community_plain_average)
+            count=@topic.apk_community_count
+          }}
+        >
           ★
           {{formatRating @topic.apk_community_average}}
         </span>

@@ -330,6 +330,11 @@ after_initialize do
     object.apk_community_rating&.dig(:average)
   end
 
+  add_to_serializer(:topic_list_item, :apk_community_plain_average) do
+    return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    object.apk_community_rating&.dig(:plain_average)
+  end
+
   add_to_serializer(:topic_list_item, :apk_community_count) do
     return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
     object.apk_community_rating&.dig(:count)
@@ -419,24 +424,9 @@ after_initialize do
       # pinned_first keeps pinned topics on top regardless of rating — core
       # disables its own pin-priority for non-default/activity orders, so this
       # ORDER BY is what keeps pins pinned here.
-      #
-      # Plain mode ranks by the average rounded like the displayed value,
-      # otherwise a 4.98 shown as "5.0" sorts below a real 5.0 with one vote.
-      # Weighted mode starts every app with `confidence` votes at the global
-      # average, so a handful of votes cannot outrank a long consistent record.
-      # It is rounded the same way, so when the catalog average sits near 5 a
-      # single 5 does not edge out a 4.95 with many votes on the third decimal.
-      # Unrated apps stay last in both modes. Equal ranks go to the app with
-      # more votes, bumped_at is the final deterministic tie-break.
-      confidence = SiteSetting.sideloaded_apps_ranking_confidence_votes
-      rank =
-        if confidence > 0
-          prior = ApkReview.global_average_rating.to_f
-          "ROUND((#{confidence} * #{prior} + community_ratings.community_sum)::numeric / " \
-            "(#{confidence} + community_ratings.community_count), 1)"
-        else
-          "community_ratings.community_avg"
-        end
+      # Unrated apps stay last. Equal scores go to the app with more votes,
+      # bumped_at is the final deterministic tie-break.
+      rank = ApkReview.community_score_sql("community_ratings")
 
       result.joins(
         "LEFT JOIN (#{ApkReview.community_stats_sql}) community_ratings " \

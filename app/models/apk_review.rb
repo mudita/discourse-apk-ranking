@@ -99,10 +99,35 @@ class ::ApkReview < ActiveRecord::Base
     return {} if ids.empty?
 
     DB
-      .query("SELECT * FROM (#{community_stats_sql}) stats WHERE topic_id IN (:ids)", ids: ids)
+      .query(<<~SQL, ids: ids)
+        SELECT stats.*, #{community_score_sql("stats")} AS community_score
+        FROM (#{community_stats_sql}) stats
+        WHERE topic_id IN (:ids)
+      SQL
       .to_h do |row|
-        [row.topic_id, { average: row.community_avg.to_f, count: row.community_count }]
+        [
+          row.topic_id,
+          {
+            average: row.community_score.to_f,
+            plain_average: row.community_avg.to_f,
+            count: row.community_count,
+          },
+        ]
       end
+  end
+
+  # The list sorts by this and every page shows it, so the order always
+  # matches the number next to it. With confidence votes > 0 each app starts
+  # with that many votes at the catalog average, so a few 5s cannot outrank a
+  # long record. Rounded like the displayed value, equal scores fall back to
+  # the vote count in the sort.
+  def self.community_score_sql(stats)
+    confidence = SiteSetting.sideloaded_apps_ranking_confidence_votes
+    return "#{stats}.community_avg" if confidence <= 0
+
+    prior = global_average_rating.to_f
+    "ROUND((#{confidence} * #{prior} + #{stats}.community_sum)::numeric / " \
+      "(#{confidence} + #{stats}.community_count), 1)"
   end
 
   def self.community_rating_for(topic_id)

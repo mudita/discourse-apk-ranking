@@ -104,6 +104,7 @@ en:
         author: "Author's Rating"
         community: "Community Rating"
         no_ratings: "No ratings yet"
+        plain_average: "Average %{average} from %{count} ratings. The ranking also counts how many people rated."
 
       stars:
         label: "Rating"

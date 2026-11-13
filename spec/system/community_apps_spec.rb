@@ -39,7 +39,7 @@ describe "Community Apps", type: :system do
         pinned_at: 1.day.ago,
       )
     single_vote = app_topic("Single Vote", ratings: [5])
-    # 19 x 5 + 1 x 4 averages 4.95, which the list displays as 5.0
+    # 19 x 5 + 1 x 4 averages 4.95, weighted against the catalog it shows 4.9
     katapult = app_topic("Katapult", ratings: [4] + [5] * 19)
     lower = app_topic("Average App", ratings: [4, 4])
 
@@ -49,7 +49,7 @@ describe "Community Apps", type: :system do
     expect(listed_ids_of([pinned, single_vote, katapult, lower])).to eq(
       [pinned.id, katapult.id, single_vote.id, lower.id],
     )
-    expect(page).to have_css("#{row(katapult)} .sideloaded-community-stars", text: "5.0")
+    expect(page).to have_css("#{row(katapult)} .sideloaded-community-stars", text: "4.9")
     expect(page).to have_css("#{row(katapult)} .sideloaded-community-count", text: "(20)")
   end
 

@@ -134,14 +134,46 @@ describe "Sideloaded apps topic list ordering" do
       )
     end
 
-    it "keeps showing the plain average in the list" do
+    it "shows the weighted score with the plain average for the tooltip" do
       SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
 
       get "/c/#{category.slug}/#{category.id}/l/latest.json", params: { order: "community_rating" }
       steady = response.parsed_body["topic_list"]["topics"].find { |t| t["id"] == steady_app.id }
 
-      expect(steady["apk_community_average"]).to eq(4.8)
+      # (5 x 3.90 catalog average + 96) / 25 votes
+      expect(steady["apk_community_average"]).to eq(4.6)
+      expect(steady["apk_community_plain_average"]).to eq(4.8)
       expect(steady["apk_community_count"]).to eq(20)
+    end
+
+    it "never shows a higher rating below a lower one" do
+      SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
+      # the staging mix where 4.9 (30) landed above 5.0 (12)
+      [
+        [5] * 47 + [4],
+        [5] * 27 + [4] * 3,
+        [5] * 12,
+        [5] * 7,
+        [5] * 7 + [4],
+        [5] * 9 + [4] * 2,
+      ].each_with_index { |ratings, i| rated_app(ratings, 4000 + i * 100) }
+
+      get "/c/#{category.slug}/#{category.id}/l/latest.json", params: { order: "community_rating" }
+      shown =
+        response.parsed_body["topic_list"]["topics"].filter_map do |t|
+          if t["apk_community_count"].to_i > 0
+            [t["apk_community_average"], t["apk_community_count"]]
+          end
+        end
+
+      expect(shown.size).to eq(9)
+      expect(shown).to eq(shown.sort_by { |average, count| [-average, -count] })
+    end
+
+    it "shows the same score on the app page" do
+      SiteSetting.sideloaded_apps_ranking_confidence_votes = 5
+
+      expect(ApkReview.community_rating_for(steady_app.id)).to include(average: 4.6, count: 20)
     end
   end
 
@@ -153,7 +185,7 @@ describe "Sideloaded apps topic list ordering" do
     PluginStore.set("sideloaded_ratings", "t#{popular_topic.id}_u#{user.id}", 5)
 
     expect(topic_ids(order: "community_rating").first).to eq(reviewed.id)
-    expect(ApkReview.community_rating_for(popular_topic.id)).to eq(average: 0.0, count: 0)
+    expect(ApkReview.community_rating_for(popular_topic.id)).to include(average: 0.0, count: 0)
   end
 
   it "does not keep a pin on top once the user has dismissed it" do
