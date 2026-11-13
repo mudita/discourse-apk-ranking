@@ -430,31 +430,6 @@ export default apiInitializer((api) => {
         });
     }
 
-    if (model?.action === "reply") {
-      const currentUser = api.getCurrentUser();
-      const topicUserId =
-        model?.topic?.user_id ?? model?.topic?.details?.created_by?.id;
-      const isAuthor =
-        currentUser && topicUserId && currentUser.id === topicUserId;
-
-      // A rating is only required when replying to an actual review. Replies
-      // to info posts (no apk_review) must not be forced to rate.
-      if (!isAuthor && model?.topic?.apk_review) {
-        const rating = model.metaData?.apk_rating;
-        if (!rating || rating < 1 || rating > 5) {
-          const topicId = model?.topic?.id;
-          const existingRating =
-            (topicId && _userRatingsCache[topicId]) ||
-            model?.topic?.apk_user_rating;
-          if (!existingRating) {
-            const dialog = api.container.lookup("service:dialog");
-            dialog.alert(i18n("sideloaded_apps.reply_rating.validation_error"));
-            return Promise.reject();
-          }
-        }
-      }
-    }
-
     return Promise.resolve();
   });
 

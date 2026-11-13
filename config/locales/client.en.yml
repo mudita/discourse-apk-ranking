@@ -72,10 +72,9 @@ en:
       reply_rating:
         title: "Your rating for the App"
         your_rating: "Your rating for the App"
-        help: "Your star rating is required when commenting"
+        help: "Rating is optional, you can also just comment"
         change_rating: "Click stars to change your rating"
         already_rated: "You have already rated this app"
-        validation_error: "Please select a star rating (1-5) for your comment."
 
       categories:
         all: "All"
