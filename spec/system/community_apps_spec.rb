@@ -204,6 +204,22 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_content(/author's rating/i)
   end
 
+  it "lets a member comment on a review without rating it" do
+    app = app_topic("Commented App")
+    sign_in(user)
+
+    visit(app.relative_url)
+    PageObjects::Pages::Topic.new.click_reply_button
+    expect(page).to have_css(".sideloaded-reply-rating")
+
+    composer = PageObjects::Components::Composer.new
+    composer.fill_content("Works fine on my Kompakt, no stars from me yet.")
+    find(".d-editor-input").send_keys(%i[control enter])
+
+    expect(page).to have_css(".topic-post", text: "Works fine on my Kompakt")
+    expect(PluginStore.get("sideloaded_ratings", "t#{app.id}_u#{user.id}")).to be_nil
+  end
+
   it "offers Tools in the app submission form" do
     sign_in(user)
 
