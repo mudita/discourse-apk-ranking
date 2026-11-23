@@ -20,8 +20,13 @@ class ::ApkReviewSerializer < ::ApplicationSerializer
              :author_is_developer,
              :mmd_dedicated,
              :icon_url,
+             :inkapps_url,
              :created_at,
              :updated_at
+
+  def inkapps_url
+    object.topic&.custom_fields&.dig("apk_inkapps_url").presence
+  end
 
   def icon_url
     url = object.topic&.custom_fields&.dig("apk_icon_url").to_s.strip

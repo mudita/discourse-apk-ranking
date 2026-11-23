@@ -12,6 +12,7 @@ import UppyUpload from "discourse/lib/uppy/uppy-upload";
 import { eq } from "discourse/truth-helpers";
 import { i18n } from "discourse-i18n";
 import { validateIconUrl } from "../lib/validate-icon-url";
+import ApkInkappsBadge from "./apk-inkapps-badge";
 import ApkMmdBadge from "./apk-mmd-badge";
 import ApkStarRating from "./apk-star-rating";
 import ApkVerificationStatus from "./apk-verification-status";
@@ -722,6 +723,13 @@ export default class ApkReviewDisplay extends Component {
             <ApkMmdBadge
               @showLabel={{true}}
               class="sideloaded-review-display__mmd-badge"
+            />
+          {{/if}}
+          {{#if @inkappsUrl}}
+            <ApkInkappsBadge
+              @url={{@inkappsUrl}}
+              @showLabel={{true}}
+              class="sideloaded-review-display__inkapps-badge"
             />
           {{/if}}
           <span

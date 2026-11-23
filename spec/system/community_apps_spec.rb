@@ -9,6 +9,8 @@ describe "Community Apps", type: :system do
     SiteSetting.sideloaded_apps_category_slug = category.slug
   end
 
+  INKAPPS_URL = "https://inkapps.mudita.com/apps/2530da8b-3b4a-4bbe-bd1c-52f21f4116d3"
+
   def app_topic(name, app_category: "utilities", ratings: [])
     topic = Fabricate(:topic, category: category, title: "#{name} review by tester")
     Fabricate(:post, topic: topic, user: topic.user)
@@ -114,6 +116,7 @@ describe "Community Apps", type: :system do
     app.custom_fields["apk_icon_url"] = "/images/discourse-logo-sketch-small.png"
     app.custom_fields["apk_mmd_dedicated"] = "true"
     app.custom_fields["apk_author_is_developer"] = "true"
+    app.custom_fields["apk_inkapps_url"] = INKAPPS_URL
     app.save_custom_fields
     no_icon = app_topic("No Icon App")
     no_icon.custom_fields["apk_author_is_developer"] = "true"
@@ -126,6 +129,7 @@ describe "Community Apps", type: :system do
     expect(all("#{badges} > *").map { |el| el[:class] }).to eq(
       [
         "sideloaded-app-category-badge",
+        "sideloaded-inkapps-badge",
         "sideloaded-mmd-badge sideloaded-topic-list-mmd-badge",
         "sideloaded-dev-badge",
       ],
@@ -139,7 +143,7 @@ describe "Community Apps", type: :system do
           const pill = box(app, ".sideloaded-app-category-badge");
           return {
             pill: [Math.round(pill.width), Math.round(pill.height)],
-            pill_to_mmd: Math.round(box(app, ".sideloaded-mmd-badge").left - pill.right),
+            pill_to_inkapps: Math.round(box(app, ".sideloaded-inkapps-badge").left - pill.right),
             icon_vs_count: Math.abs(middle(box(app, ".pull-left")) - middle(box(app, ".pull-right"))),
             pill_vs_dev: Math.abs(middle(pill) - middle(box(app, ".sideloaded-dev-badge"))),
             no_icon_pill_to_dev: Math.round(
@@ -150,7 +154,7 @@ describe "Community Apps", type: :system do
         })()
       JS
     expect(geometry["pill"]).to eq([118, 22])
-    expect(geometry["pill_to_mmd"]).to eq(6)
+    expect(geometry["pill_to_inkapps"]).to eq(6)
     expect(geometry["no_icon_pill_to_dev"]).to eq(6)
     expect(geometry["icon_vs_count"]).to be <= 2
     expect(geometry["pill_vs_dev"]).to be <= 2
@@ -159,6 +163,44 @@ describe "Community Apps", type: :system do
     expect(page).to have_no_css("#{row(app)} .pull-left img.avatar")
     expect(page).to have_css("#{row(no_icon)} .pull-left .sideloaded-topic-list-icon-blank")
     expect(page).to have_no_css("#{row(no_icon)} .pull-left img")
+  end
+
+  it "links apps marked as available in InkApps from their own column" do
+    marked = app_topic("Marked App")
+    marked.custom_fields["apk_inkapps_url"] = INKAPPS_URL
+    marked.save_custom_fields
+    plain = app_topic("Plain App")
+
+    visit("/c/#{category.slug}/#{category.id}")
+
+    expect(page).to have_css(
+      "#{row(marked)} td.sideloaded-col--inkapps a.sideloaded-inkapps-badge[href='#{INKAPPS_URL}']",
+    )
+    expect(page).to have_css("#{row(plain)} td.sideloaded-col--inkapps")
+    expect(page).to have_no_css("#{row(plain)} .sideloaded-inkapps-badge")
+  end
+
+  it "lets Mudita staff mark an app from its review and keeps the field from members" do
+    app = app_topic("Staff Marked App")
+    sign_in(user)
+    visit(app.relative_url)
+    expect(page).to have_css(".sideloaded-review-display")
+    expect(page).to have_no_css(".sideloaded-inkapps-editor")
+
+    sign_in(Fabricate(:admin))
+    visit(app.relative_url)
+    find(".sideloaded-inkapps-editor input").fill_in(with: INKAPPS_URL)
+    find(".sideloaded-inkapps-editor__save").click
+
+    expect(page).to have_css(
+      ".sideloaded-review-display__header a.sideloaded-inkapps-badge[href='#{INKAPPS_URL}']",
+    )
+    expect(app.reload.custom_fields["apk_inkapps_url"]).to eq(INKAPPS_URL)
+
+    find(".sideloaded-inkapps-editor__remove").click
+
+    expect(page).to have_no_css(".sideloaded-review-display__header .sideloaded-inkapps-badge")
+    expect(app.reload.custom_fields["apk_inkapps_url"]).to be_nil
   end
 
   it "labels recently updated apps until the label window passes" do

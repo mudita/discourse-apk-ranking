@@ -13,6 +13,8 @@ import ApkComposerFields, {
   getPendingApkData,
   triggerValidateAll,
 } from "../components/apk-composer-fields";
+import ApkInkappsBadge from "../components/apk-inkapps-badge";
+import ApkInkappsEditor from "../components/apk-inkapps-editor";
 import ApkMmdBadge from "../components/apk-mmd-badge";
 import ApkReviewDisplay from "../components/apk-review-display";
 import ApkStarRating from "../components/apk-star-rating";
@@ -445,6 +447,8 @@ export default apiInitializer((api) => {
         );
       }
 
+      @tracked _inkappsUrl;
+
       constructor() {
         super(...arguments);
         document.body.classList.add("sideloaded-apps-topic");
@@ -457,6 +461,17 @@ export default apiInitializer((api) => {
 
       get currentUser() {
         return api.getCurrentUser();
+      }
+
+      get inkappsUrl() {
+        return this._inkappsUrl === undefined
+          ? this.args.outletArgs?.post?.topic?.apk_review?.inkapps_url
+          : this._inkappsUrl;
+      }
+
+      @action
+      updateInkappsUrl(url) {
+        this._inkappsUrl = url;
       }
 
       get isAuthor() {
@@ -490,7 +505,15 @@ export default apiInitializer((api) => {
             @isAuthor={{this.isAuthor}}
             @currentUser={{this.currentUser}}
             @onRated={{this.handleRated}}
+            @inkappsUrl={{this.inkappsUrl}}
           />
+          {{#if @outletArgs.post.topic.apk_can_manage_inkapps}}
+            <ApkInkappsEditor
+              @topicId={{@outletArgs.post.topic.id}}
+              @url={{this.inkappsUrl}}
+              @onChange={{this.updateInkappsUrl}}
+            />
+          {{/if}}
         </div>
       </template>
     }
@@ -597,10 +620,12 @@ export default apiInitializer((api) => {
     </td>
   </template>;
 
-  // Kept empty on purpose: the design reserves this slot for the InkApps
-  // availability badge, so the other columns do not shift when it lands.
   const InkAppsItem = <template>
-    <td class="topic-list-data sideloaded-col sideloaded-col--inkapps"></td>
+    <td class="topic-list-data sideloaded-col sideloaded-col--inkapps">
+      {{#if @topic.apk_inkapps_url}}
+        <ApkInkappsBadge @url={{@topic.apk_inkapps_url}} />
+      {{/if}}
+    </td>
   </template>;
 
   const MmdItem = <template>
@@ -718,6 +743,9 @@ export default apiInitializer((api) => {
             <span class="sideloaded-app-category-badge">
               {{appCategoryLabel @outletArgs.topic}}
             </span>
+          {{/if}}
+          {{#if @outletArgs.topic.apk_inkapps_url}}
+            <ApkInkappsBadge @url={{@outletArgs.topic.apk_inkapps_url}} />
           {{/if}}
           {{#if @outletArgs.topic.apk_mmd_dedicated}}
             <ApkMmdBadge class="sideloaded-topic-list-mmd-badge" />
