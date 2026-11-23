@@ -589,6 +589,7 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
 
   &__header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
@@ -612,6 +613,12 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
     border-radius: 10px;
     border: 1px solid $sl-border;
     background: $sl-bg-light;
+  }
+
+  &__category-badge,
+  &__mmd-badge,
+  &__inkapps-badge {
+    flex-shrink: 0;
   }
 
   &__category-badge {
@@ -974,6 +981,83 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   }
 }
 
+// Sized after the design: a 32px framed tile in the 40px list column.
+.sideloaded-inkapps-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--primary-low-mid);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--primary);
+  vertical-align: middle;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--primary-medium);
+    color: var(--primary);
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+  }
+
+  &__text {
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+}
+
+.sideloaded-review-display__inkapps-badge {
+  width: auto;
+  height: auto;
+  padding: 2px 8px;
+
+  .sideloaded-inkapps-badge__icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.sideloaded-inkapps-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--primary-low-mid);
+  border-radius: 6px;
+
+  &__label {
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    input {
+      flex: 1 1 260px;
+      margin: 0;
+    }
+  }
+
+  &__help {
+    font-size: 0.8em;
+    color: var(--primary-medium);
+  }
+}
+
 .sideloaded-topic-list-mmd-badge {
   margin-right: 6px;
 }
@@ -1030,10 +1114,22 @@ body.sideloaded-composer-active #reply-control .composer-action-title {
   margin-top: 6px;
 
   .sideloaded-app-category-badge,
+  .sideloaded-inkapps-badge,
   .sideloaded-topic-list-mmd-badge,
   .sideloaded-dev-badge {
     flex-shrink: 0;
     margin: 0;
+  }
+
+  .sideloaded-inkapps-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+
+    .sideloaded-inkapps-badge__icon {
+      width: 16px;
+      height: 16px;
+    }
   }
 
   // Narrowest width that still fits the longest label, "Health & Fitness".

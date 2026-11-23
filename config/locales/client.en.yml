@@ -176,6 +176,13 @@ en:
       dev_badge_title: "Review author is the app developer"
       updated_badge: "Updated %{date}"
       updated_badge_title: "A new version or file was published on %{date}"
+      inkapps:
+        label: "InkApps"
+        badge_title: "Also available in InkApps"
+        editor_label: "InkApps link (Mudita staff only)"
+        editor_help: "Paste the app page from inkapps.mudita.com to show the InkApps icon in the ranking. Clear it to remove the icon."
+        save: "Save"
+        remove: "Remove"
       mmd_badge: "MMD"
       mmd_badge_title: "Dedicated for Mudita Kompakt"
       report_outdated: "Report outdated version"

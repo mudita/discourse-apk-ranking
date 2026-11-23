@@ -12,6 +12,10 @@ plugins:
     min: 0
     max: 100
     description: "Weighted ranking: how many votes at the catalog average every app starts with. 0 ranks by the plain average."
+  sideloaded_apps_inkapps_editor_groups:
+    type: group_list
+    default: ""
+    description: "Moderators in these groups can mark apps as available in InkApps. Admins always can. Moderators outside them (e.g. from the community) cannot."
   sideloaded_apps_updated_badge_days:
     default: 14
     min: 0

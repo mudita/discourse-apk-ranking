@@ -5,6 +5,7 @@ en:
     errors:
       not_found: "Review not found"
       not_in_category: "This topic is not in the Community Apps Ranking category"
+      inkapps_invalid_url: "Paste the app page link from inkapps.mudita.com, e.g. https://inkapps.mudita.com/apps/…"
     report_outdated:
       pm_title: "Outdated version report: %{app_name}"
       pm_body: |

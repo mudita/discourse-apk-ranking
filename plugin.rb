@@ -94,6 +94,7 @@ after_initialize do
   TopicList.preloaded_custom_fields << "apk_author_is_developer"
   TopicList.preloaded_custom_fields << "apk_icon_url"
   TopicList.preloaded_custom_fields << "apk_mmd_dedicated"
+  TopicList.preloaded_custom_fields << "apk_inkapps_url"
 
   # Ensure topic_opts (containing custom_fields) survives the approval queue
   NewPostManager.add_plugin_payload_attribute(:topic_opts)
@@ -207,6 +208,7 @@ after_initialize do
     get "/sideloaded-apps/reviews/:id" => "apk_reviews#show"
     post "/sideloaded-apps/reviews" => "apk_reviews#create"
     put "/sideloaded-apps/reviews/:id" => "apk_reviews#update"
+    put "/sideloaded-apps/reviews/:topic_id/inkapps" => "apk_reviews#update_inkapps"
     post "/sideloaded-apps/rate" => "apk_reviews#rate"
     post "/sideloaded-apps/track-download" => "apk_reviews#track_download"
     post "/sideloaded-apps/validate-link" => "apk_reviews#validate_link"
@@ -364,6 +366,16 @@ after_initialize do
     return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
     url = object.custom_fields["apk_icon_url"].to_s.strip
     url.present? ? url : nil
+  end
+
+  add_to_serializer(:topic_list_item, :apk_inkapps_url) do
+    return nil unless object.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    object.custom_fields["apk_inkapps_url"].presence
+  end
+
+  add_to_serializer(:topic_view, :apk_can_manage_inkapps) do
+    return false unless object.topic.category&.slug == SiteSetting.sideloaded_apps_category_slug
+    ApkReview.inkapps_editor?(scope.user)
   end
 
   add_to_serializer(:topic_view, :apk_author_is_developer) do

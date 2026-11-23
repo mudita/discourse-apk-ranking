@@ -24,6 +24,17 @@ class ::ApkReview < ActiveRecord::Base
   validates :author_rating, absence: true, if: :author_is_developer?
   validates :app_description, presence: true
 
+  INKAPPS_APP_URL = %r{\Ahttps://inkapps\.mudita\.com/apps/[0-9a-f-]{36}/?\z}
+
+  # Community moderators are staff too, so the group setting is what keeps
+  # the InkApps mark in the hands of Mudita employees.
+  def self.inkapps_editor?(user)
+    return false unless user&.staff?
+    return true if user.admin?
+
+    user.in_any_groups?(SiteSetting.sideloaded_apps_inkapps_editor_groups_map)
+  end
+
   APP_CATEGORIES = %w[
     communication
     social

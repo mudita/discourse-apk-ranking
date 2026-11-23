@@ -371,6 +371,31 @@ class ::ApkReviewsController < ::ApplicationController
     render json: { success: true }
   end
 
+  def update_inkapps
+    review = ApkReview.find_by(topic_id: params[:topic_id])
+    raise Discourse::NotFound unless review&.topic
+    raise Discourse::InvalidAccess unless ApkReview.inkapps_editor?(current_user)
+
+    url = params[:url].to_s.strip.presence
+    if url && !ApkReview::INKAPPS_APP_URL.match?(url)
+      return(
+        render json: { error: I18n.t("sideloaded_apps.errors.inkapps_invalid_url") }, status: 422
+      )
+    end
+
+    topic = review.topic
+    topic.custom_fields["apk_inkapps_url"] = url
+    topic.save_custom_fields(true)
+    StaffActionLogger.new(current_user).log_custom(
+      "sideloaded_apps_inkapps",
+      topic_id: topic.id,
+      app_name: review.app_name,
+      inkapps_url: url.to_s,
+    )
+
+    render json: { inkapps_url: url }
+  end
+
   private
 
   def compute_checksum_for(url, original_checksum)
